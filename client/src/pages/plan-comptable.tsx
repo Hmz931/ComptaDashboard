@@ -31,7 +31,7 @@ export default function PlanComptablePage() {
       (acc.accountNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
       (acc.accountName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
     ).sort((a, b) => {
-      const numA = parseInt(acc?.accountNumber || "") || 0;
+      const numA = parseInt(a?.accountNumber || "") || 0;
       const numB = parseInt(b?.accountNumber || "") || 0;
       return numA - numB;
     });
