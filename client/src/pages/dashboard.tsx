@@ -282,17 +282,13 @@ export default function Dashboard() {
       })).filter(i => i.value > 0);
   }, [transactions, selectedYearsForCharts, accounts]);
 
-  // Pie Chart Data (Produits/Revenue per Category) - filtered by selected years, NO date range restriction
+  // Pie Chart Data (Produits/Revenue per Account) - filtered by selected years, NO date range restriction
   const pieChartDataProduits = useMemo(() => {
-      const data: Record<string, number> = {
-          "Ventes (30xx)": 0,
-          "Services (31xx)": 0,
-          "Autres produits (32-38xx)": 0
-      };
+      const data: Record<string, { number: string, name: string, value: number }> = {};
 
       // Filter transactions by selected years
       const selectedYearsSet = new Set(selectedYearsForCharts);
-      const accountMap = new Map(accounts.map(a => [a.id, a.number]));
+      const accountMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
       
       transactions.forEach(txn => {
           const year = new Date(parseISO(txn.date)).getFullYear();
@@ -300,19 +296,23 @@ export default function Dashboard() {
 
           const accountNum = accountMap.get(txn.accountId);
           if (!accountNum) return;
-          if (accountNum[0] !== '3') return;
+          if (accountNum.number[0] !== '3') return;
 
           const revenue = txn.credit > 0 ? txn.credit : -txn.debit;
-          const secondDigit = accountNum[1];
-          if (secondDigit === '0') data["Ventes (30xx)"] += revenue;
-          else if (secondDigit === '1') data["Services (31xx)"] += revenue;
-          else data["Autres produits (32-38xx)"] += revenue;
+          const key = accountNum.number;
+          if (!data[key]) {
+              data[key] = { number: accountNum.number, name: accountNum.name, value: 0 };
+          }
+          data[key].value += revenue;
       });
 
-      return Object.entries(data).map(([name, value]) => ({
-          name,
-          value: Math.abs(value)
-      })).filter(i => i.value > 0);
+      return Object.values(data)
+          .map(item => ({
+              name: `${item.number} - ${item.name}`,
+              value: Math.abs(item.value)
+          }))
+          .filter(i => i.value > 0)
+          .sort((a, b) => b.value - a.value);
   }, [transactions, selectedYearsForCharts, accounts]);
 
   const PIE_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
@@ -330,7 +330,7 @@ export default function Dashboard() {
                 <div className="p-2 bg-primary/10 rounded-lg text-primary">
                     <TrendingUp className="h-8 w-8" />
                 </div>
-                Mecahome Sarl
+                HBO Analytics
               </h1>
               <p className="text-muted-foreground mt-1 text-sm">Suivi Évolution des Comptes • {filteredData.length} écritures</p>
             </div>
@@ -348,6 +348,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant="link" size="sm" onClick={() => setLocation("/plan-comptable")}>
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Plan
+                </Button>
+                <Button variant="link" size="sm" onClick={() => setLocation("/comparison")}>
+                  <BarChart3 className="mr-2 h-4 w-4" /> Comparaison
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
