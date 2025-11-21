@@ -4,9 +4,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, X } from "lucide-react";
 import { parseISO } from "date-fns";
 import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, CATEGORIE_LABELS } from "@/lib/mockData";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function ComparisonPage() {
   const { data } = useData();
@@ -15,6 +16,8 @@ export default function ComparisonPage() {
   const accounts = data?.accounts || MOCK_ACCOUNTS;
   const transactions = data?.transactions || MOCK_TRANSACTIONS;
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [selectedSubAccounts, setSelectedSubAccounts] = useState<string[]>([]);
 
   // Extract years and build comparison data by category
   const comparisonData = useMemo(() => {
@@ -29,6 +32,7 @@ export default function ComparisonPage() {
     
     // Build data structure: for each category, sum amounts by year
     const dataByCategory: Record<string, Record<number, number>> = {};
+    const subAccountsByCategory: Record<string, { id: string, number: string, name: string }[]> = {};
     
     transactions.forEach(txn => {
       const year = new Date(parseISO(txn.date)).getFullYear();
@@ -46,6 +50,18 @@ export default function ComparisonPage() {
       
       const amount = txn.debit - txn.credit;
       dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+    });
+
+    // Build sub-accounts list for each category
+    accounts.forEach(acc => {
+      const categoryCode = acc.number.substring(0, 2);
+      const categoryLabel = CATEGORIE_LABELS[categoryCode] || `Catégorie ${categoryCode}`;
+      const key = `${categoryCode} - ${categoryLabel}`;
+      
+      if (!subAccountsByCategory[key]) {
+        subAccountsByCategory[key] = [];
+      }
+      subAccountsByCategory[key].push({ id: acc.id, number: acc.number, name: acc.name });
     });
 
     // For balance sheet accounts (1xxx, 2xxx), calculate cumulative balances
@@ -84,7 +100,7 @@ export default function ComparisonPage() {
       .map(([category, _]) => category)
       .sort();
 
-    return { chartData, years, accountsMap, allCategories: allCategoriesFiltered };
+    return { chartData, years, accountsMap, allCategories: allCategoriesFiltered, subAccountsByCategory };
   }, [transactions, accounts]);
 
   // Colors for bars
@@ -148,29 +164,65 @@ export default function ComparisonPage() {
             <CardContent className="space-y-3">
               <div className="max-h-[450px] overflow-y-auto space-y-2">
                 {comparisonData.allCategories.map((category) => (
-                  <label key={category} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-muted rounded">
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(category)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedCategories([...selectedCategories, category]);
-                        } else {
-                          setSelectedCategories(selectedCategories.filter(a => a !== category));
-                        }
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-xs">{category}</span>
-                  </label>
+                  <div key={category} className="border rounded-md p-2 space-y-2 bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setExpandedCategory(expandedCategory === category ? null : category)}
+                        className="p-1 hover:bg-muted rounded"
+                      >
+                        {expandedCategory === category ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </button>
+                      <Checkbox
+                        checked={selectedCategories.includes(category)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedCategories([...selectedCategories, category]);
+                          } else {
+                            setSelectedCategories(selectedCategories.filter(a => a !== category));
+                            setSelectedSubAccounts(selectedSubAccounts.filter(id => {
+                              const acc = accounts.find(a => a.id === id);
+                              return !acc?.number.startsWith(category.substring(0, 2));
+                            }));
+                          }
+                        }}
+                      />
+                      <label className="text-xs cursor-pointer flex-1">{category}</label>
+                    </div>
+
+                    {expandedCategory === category && (
+                      <div className="ml-6 border-l border-muted pl-2 space-y-1">
+                        {comparisonData.subAccountsByCategory[category]?.map((subAcc) => (
+                          <div key={subAcc.id} className="flex items-center gap-2">
+                            <Checkbox
+                              checked={selectedSubAccounts.includes(subAcc.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedSubAccounts([...selectedSubAccounts, subAcc.id]);
+                                } else {
+                                  setSelectedSubAccounts(selectedSubAccounts.filter(id => id !== subAcc.id));
+                                }
+                              }}
+                            />
+                            <label className="text-xs cursor-pointer">
+                              <span className="font-mono font-bold text-[10px]">{subAcc.number}</span> <span className="text-[10px]">{subAcc.name}</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
-              {selectedCategories.length > 0 && (
+              {(selectedCategories.length > 0 || selectedSubAccounts.length > 0) && (
                 <Button 
                   size="sm" 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => setSelectedCategories([])}
+                  onClick={() => {
+                    setSelectedCategories([]);
+                    setSelectedSubAccounts([]);
+                    setExpandedCategory(null);
+                  }}
                 >
                   Réinitialiser
                 </Button>
