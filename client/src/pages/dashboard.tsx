@@ -200,13 +200,6 @@ export default function Dashboard() {
         }));
     }
   }, [filteredData, selectedAccounts, selectedCategory]);
-  
-  // Helper to parse date for sorting (since date-fns parse needs format)
-  const parse = (dateString: string, formatString: string, referenceDate: Date) => {
-      // Simple implementation or use date-fns parse
-      const parts = dateString.split('.');
-      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-  };
 
   // Calculate Summary Stats
   const summaryStats = useMemo(() => {
