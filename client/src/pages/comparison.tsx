@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
-import { parseISO } from "date-fns";
+import { parseISO, format } from "date-fns";
 import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, CATEGORIE_LABELS } from "@/lib/mockData";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function ComparisonPage() {
   const { data } = useData();
@@ -113,7 +115,14 @@ export default function ComparisonPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <Tabs defaultValue="comparaison" className="w-full space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="comparaison">Comparaison</TabsTrigger>
+            <TabsTrigger value="details">Détails</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="comparaison" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <Card className="lg:col-span-3">
             <CardHeader>
               <CardTitle>Montants par Année et Catégorie</CardTitle>
@@ -177,7 +186,49 @@ export default function ComparisonPage() {
               )}
             </CardContent>
           </Card>
-        </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="details" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Détails des Transactions</CardTitle>
+                <CardDescription>Toutes les écritures par année et catégorie</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {comparisonData.years.map(year => (
+                    <div key={year} className="space-y-3">
+                      <h3 className="font-semibold text-lg">Année {year}</h3>
+                      <div className="overflow-x-auto">
+                        <Table className="text-sm">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Catégorie</TableHead>
+                              <TableHead className="text-right">Montant</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {displayCategories.map(category => {
+                              const yearData = comparisonData.chartData.find(d => d.year === year.toString());
+                              const amount = yearData ? (yearData[category as keyof typeof yearData] as number) || 0 : 0;
+                              return (
+                                <TableRow key={`${year}-${category}`}>
+                                  <TableCell className="text-xs">{category}</TableCell>
+                                  <TableCell className="text-right font-mono text-xs">{amount.toLocaleString('fr-CH', { minimumFractionDigits: 0 })}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

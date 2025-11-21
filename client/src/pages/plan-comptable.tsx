@@ -28,11 +28,11 @@ export default function PlanComptablePage() {
 
   const filteredAccounts = useMemo(() => {
     return allAccounts.filter(acc => 
-      acc.accountNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      acc.accountName.toLowerCase().includes(searchTerm.toLowerCase())
+      (acc.accountNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (acc.accountName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
     ).sort((a, b) => {
-      const numA = parseInt(a.accountNumber) || 0;
-      const numB = parseInt(b.accountNumber) || 0;
+      const numA = parseInt(a.accountNumber ?? "0") || 0;
+      const numB = parseInt(b.accountNumber ?? "0") || 0;
       return numA - numB;
     });
   }, [allAccounts, searchTerm]);
