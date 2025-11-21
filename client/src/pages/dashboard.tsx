@@ -39,10 +39,17 @@ export default function Dashboard() {
   
   const [selectedCategory, setSelectedCategory] = useState<string>("Tous les comptes");
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfYear(new Date()),
-    to: endOfYear(new Date()),
-  });
+  
+  // Calculate default date range from actual data
+  const defaultDateRange = useMemo(() => {
+    if (transactions.length === 0) {
+      return { from: startOfYear(new Date()), to: endOfYear(new Date()) };
+    }
+    const dates = transactions.map(t => new Date(parseISO(t.date))).sort((a, b) => a.getTime() - b.getTime());
+    return { from: dates[0], to: dates[dates.length - 1] };
+  }, [transactions]);
+  
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultDateRange);
 
   // Helper to parse date for sorting (must be defined before useMemo that uses it)
   const parse = (dateString: string, formatString: string, referenceDate: Date) => {
@@ -222,29 +229,46 @@ export default function Dashboard() {
   }, [filteredData]);
 
   // Pie Chart Data (Charges per Category)
-  const pieChartData = useMemo(() => {
-      // Filter accounts starting with 4, 5, 6
-      const chargesCategories = {
-          "4": "Coûts directs",
-          "5": "Charges de personnel",
-          "6": "Autres charges"
-      };
-      
+  const pieChartDataCharges = useMemo(() => {
       const data: Record<string, number> = {
-          "Coûts directs": 0,
-          "Charges de personnel": 0,
-          "Autres charges": 0
+          "Coûts directs (4xxx)": 0,
+          "Charges de personnel (5xxx)": 0,
+          "Autres charges (6xxx)": 0
       };
 
       // We can use Income Statement items
       incomeStatement.forEach(item => {
           const firstDigit = item.accountNumber[0];
-          if (firstDigit === '4') data["Coûts directs"] += item.amount;
-          if (firstDigit === '5') data["Charges de personnel"] += item.amount;
-          if (firstDigit === '6') data["Autres charges"] += item.amount;
+          if (firstDigit === '4') data["Coûts directs (4xxx)"] += item.amount;
+          if (firstDigit === '5') data["Charges de personnel (5xxx)"] += item.amount;
+          if (firstDigit === '6') data["Autres charges (6xxx)"] += item.amount;
       });
 
       // Note: Expenses are typically Positive (Debit) in our IS calculation from excel-processor
+      return Object.entries(data).map(([name, value]) => ({
+          name,
+          value: Math.abs(value)
+      })).filter(i => i.value > 0);
+  }, [incomeStatement]);
+
+  // Pie Chart Data (Produits/Revenue per Category)
+  const pieChartDataProduits = useMemo(() => {
+      const data: Record<string, number> = {
+          "Ventes (30xx)": 0,
+          "Services (31xx)": 0,
+          "Autres produits (32-38xx)": 0
+      };
+
+      // Revenue accounts start with 3
+      incomeStatement.forEach(item => {
+          if (item.accountNumber[0] === '3') {
+              const secondDigit = item.accountNumber[1];
+              if (secondDigit === '0') data["Ventes (30xx)"] += Math.abs(item.amount);
+              else if (secondDigit === '1') data["Services (31xx)"] += Math.abs(item.amount);
+              else data["Autres produits (32-38xx)"] += Math.abs(item.amount);
+          }
+      });
+
       return Object.entries(data).map(([name, value]) => ({
           name,
           value: Math.abs(value)
@@ -370,6 +394,13 @@ export default function Dashboard() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Période</label>
+                <p className="text-[10px] text-muted-foreground">
+                  {dateRange?.from && dateRange?.to ? (
+                    <>Affichage: {format(dateRange.from, "dd.MM.yyyy")} - {format(dateRange.to, "dd.MM.yyyy")}</>
+                  ) : (
+                    <>Sélectionnez une période</>
+                  )}
+                </p>
                 <CalendarDateRangePicker date={dateRange} setDate={setDateRange} />
               </div>
             </div>
@@ -509,17 +540,18 @@ export default function Dashboard() {
                         </CardContent>
                       </Card>
                       
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <Card>
                           <CardHeader>
                               <CardTitle>Répartition Charges</CardTitle>
                           </CardHeader>
                           <CardContent>
-                                {pieChartData.length > 0 ? (
+                                {pieChartDataCharges.length > 0 ? (
                                     <div className="w-full" style={{ minHeight: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <ResponsiveContainer width="100%" height={250}>
                                             <PieChart>
                                                 <Pie
-                                                    data={pieChartData}
+                                                    data={pieChartDataCharges}
                                                     cx="50%"
                                                     cy="50%"
                                                     innerRadius={30}
@@ -527,7 +559,7 @@ export default function Dashboard() {
                                                     paddingAngle={3}
                                                     dataKey="value"
                                                 >
-                                                    {pieChartData.map((entry, index) => (
+                                                    {pieChartDataCharges.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                                     ))}
                                                 </Pie>
@@ -543,6 +575,42 @@ export default function Dashboard() {
                                 )}
                           </CardContent>
                       </Card>
+
+                      <Card>
+                          <CardHeader>
+                              <CardTitle>Répartition Produits</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                                {pieChartDataProduits.length > 0 ? (
+                                    <div className="w-full" style={{ minHeight: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <ResponsiveContainer width="100%" height={250}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={pieChartDataProduits}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={30}
+                                                    outerRadius={60}
+                                                    paddingAngle={3}
+                                                    dataKey="value"
+                                                >
+                                                    {pieChartDataProduits.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
+                                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-center h-[250px] text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                                        Aucune donnée
+                                    </div>
+                                )}
+                          </CardContent>
+                      </Card>
+                      </div>
                   </div>
               </div>
             </TabsContent>
