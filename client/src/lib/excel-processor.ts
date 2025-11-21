@@ -95,7 +95,8 @@ export const processGLFile = async (file: File): Promise<{
     transactions: Transaction[],
     balanceSheet: FinancialStatementItem[],
     incomeStatement: FinancialStatementItem[],
-    rawProcessedData: any
+    rawProcessedData: any,
+    years: number[]
 }> => {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -103,6 +104,7 @@ export const processGLFile = async (file: File): Promise<{
     const allAccounts: Account[] = [];
     const allTransactions: Transaction[] = [];
     const rawCleanData: any[] = [];
+    const yearsSet = new Set<number>();
     
     // --- STEP 1: Process Sheets (GL Cleaning) ---
     workbook.SheetNames.forEach((sheetName) => {
@@ -223,6 +225,7 @@ export const processGLFile = async (file: File): Promise<{
                 // Add to transactions list
                 // Use a random ID or compose one
                 const txnDate = parse(dateStr, 'dd.MM.yyyy', new Date());
+                yearsSet.add(txnDate.getFullYear());
                 
                 if (debit !== 0 || credit !== 0) {
                     allTransactions.push({
@@ -354,11 +357,14 @@ export const processGLFile = async (file: File): Promise<{
         amount: -incomeSum // Balancing entry?
     });
 
+    const years = Array.from(yearsSet).sort((a, b) => a - b);
+    
     return {
         accounts: allAccounts,
         transactions: allTransactions,
         balanceSheet: balanceSheetItems,
         incomeStatement: incomeStatementItems,
+        years: years,
         rawProcessedData: {
             cleanGL: rawCleanData,
             planComptable: allAccounts.map(a => ({ 'Numéro de compte': a.number, 'Nom de compte': a.name, 'Nature': NATURE_MAPPING[a.number[0]] || 'Inconnue' })),

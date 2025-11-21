@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, ArrowUpRight, ArrowDownRight, Minus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
@@ -43,6 +43,12 @@ export default function Dashboard() {
     from: startOfYear(new Date()),
     to: endOfYear(new Date()),
   });
+
+  // Helper to parse date for sorting (must be defined before useMemo that uses it)
+  const parse = (dateString: string, formatString: string, referenceDate: Date) => {
+      const parts = dateString.split('.');
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+  };
 
   const ratios = useMemo(() => calculateRatios(accounts, transactions, balanceSheet, incomeStatement), [accounts, transactions, balanceSheet, incomeStatement]);
 
@@ -272,12 +278,17 @@ export default function Dashboard() {
               <p className="text-muted-foreground mt-1 text-sm">Suivi Évolution des Comptes • {filteredData.length} écritures</p>
             </div>
             <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setSelectedCategory("Tous les comptes"); setSelectedAccounts([]); setDateRange({ from: startOfYear(new Date()), to: endOfYear(new Date()) }); }} data-testid="button-reset-filters">
+                  <RotateCcw className="mr-2 h-4 w-4" /> Réinitialiser
+                </Button>
                 {!data && (
                      <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
                         <UploadPageIcon className="mr-2 h-4 w-4" /> Nouvel Import
                      </Button>
                 )}
-                
+                <Button variant="link" size="sm" onClick={() => setLocation("/ratios")}>
+                  <FileText className="mr-2 h-4 w-4" /> Ratios
+                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="default" size="sm">
@@ -509,26 +520,34 @@ export default function Dashboard() {
                           <CardHeader>
                               <CardTitle>Répartition Charges</CardTitle>
                           </CardHeader>
-                          <CardContent className="h-[200px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={pieChartData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={40}
-                                            outerRadius={70}
-                                            paddingAngle={5}
-                                            dataKey="value"
-                                        >
-                                            {pieChartData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                        <Legend />
-                                    </PieChart>
-                                </ResponsiveContainer>
+                          <CardContent>
+                                {pieChartData.length > 0 ? (
+                                    <div className="w-full" style={{ minHeight: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <ResponsiveContainer width="100%" height={250}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={pieChartData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={30}
+                                                    outerRadius={60}
+                                                    paddingAngle={3}
+                                                    dataKey="value"
+                                                >
+                                                    {pieChartData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
+                                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-center h-[250px] text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                                        Aucune donnée
+                                    </div>
+                                )}
                           </CardContent>
                       </Card>
                   </div>
@@ -581,87 +600,76 @@ export default function Dashboard() {
             </TabsContent>
 
             {/* Tab 3: Resume */}
-            <TabsContent value="resume">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
+            <TabsContent value="resume" className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <Card className="lg:col-span-2">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" /> Bilan (Extrait)</CardTitle>
+                            <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" /> Bilan</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Compte</TableHead>
-                                        <TableHead className="text-right">Montant</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {balanceSheet.map((item) => (
-                                        <TableRow key={item.accountNumber}>
-                                            <TableCell>
-                                                <span className="font-mono font-bold mr-2">{item.accountNumber}</span>
-                                                {item.accountName}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono">{item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                            <div className="space-y-6">
+                                <div>
+                                    <h4 className="font-semibold text-sm mb-3 text-emerald-700 dark:text-emerald-400">Actifs (1xxx)</h4>
+                                    <Table className="text-sm">
+                                        <TableBody>
+                                            {balanceSheet.filter(i => i.accountNumber.startsWith('1')).slice(0, 10).map((item) => (
+                                                <TableRow key={item.accountNumber}>
+                                                    <TableCell className="text-xs"><span className="font-mono font-bold">{item.accountNumber}</span></TableCell>
+                                                    <TableCell className="text-xs text-muted-foreground">{item.accountName}</TableCell>
+                                                    <TableCell className="text-right font-mono text-xs">{item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 0 })}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                <div className="border-t pt-4">
+                                    <h4 className="font-semibold text-sm mb-3 text-red-700 dark:text-red-400">Passifs & Fonds Propres (2xxx)</h4>
+                                    <Table className="text-sm">
+                                        <TableBody>
+                                            {balanceSheet.filter(i => i.accountNumber.startsWith('2')).slice(0, 10).map((item) => (
+                                                <TableRow key={item.accountNumber}>
+                                                    <TableCell className="text-xs"><span className="font-mono font-bold">{item.accountNumber}</span></TableCell>
+                                                    <TableCell className="text-xs text-muted-foreground">{item.accountName}</TableCell>
+                                                    <TableCell className="text-right font-mono text-xs">{Math.abs(item.amount).toLocaleString('fr-CH', { minimumFractionDigits: 0 })}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 
                     <div className="space-y-6">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Compte de Résultat</CardTitle>
+                                <CardTitle className="text-base">Résultat Net</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-6">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Compte</TableHead>
-                                            <TableHead className="text-right">Montant</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {incomeStatement.map((item) => (
-                                            <TableRow key={item.accountNumber}>
-                                                <TableCell>
-                                                    <span className="font-mono font-bold mr-2">{item.accountNumber}</span>
-                                                    {item.accountName}
-                                                </TableCell>
-                                                <TableCell className={cn("text-right font-mono", item.amount < 0 ? "text-red-500" : "")}>
-                                                    {item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                                
-                                <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg border border-border">
-                                    <span className="font-bold text-lg">Résultat Net</span>
-                                    <Badge variant={netResult >= 0 ? "default" : "destructive"} className="text-lg px-3 py-1">
-                                        {Math.abs(netResult).toLocaleString('fr-CH', { style: 'currency', currency: 'CHF' })}
-                                        {netResult < 0 ? " (Bénéfice)" : " (Perte)"}
+                            <CardContent>
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className={cn("text-3xl font-bold", netResult < 0 ? "text-emerald-600" : "text-red-600")}>
+                                        {Math.abs(netResult).toLocaleString('fr-CH', { minimumFractionDigits: 0 })} CHF
+                                    </div>
+                                    <Badge variant={netResult >= 0 ? "destructive" : "default"}>
+                                        {netResult < 0 ? "Bénéfice" : "Perte"}
                                     </Badge>
                                 </div>
                             </CardContent>
                         </Card>
 
                         <Card>
-                             <CardHeader>
-                                <CardTitle>Analyse de Rentabilité</CardTitle>
+                            <CardHeader>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <FileText className="h-4 w-4" /> Santé financière
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                {ratios.filter(r => r.category === "profitability").map(ratio => (
-                                    <div key={ratio.name} className="flex justify-between items-center border-b last:border-0 pb-2 last:pb-0">
-                                        <div>
-                                            <div className="font-medium text-sm">{ratio.name}</div>
-                                            <div className="text-[10px] text-muted-foreground">{ratio.interpretation}</div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-mono font-bold text-lg">{ratio.value.toFixed(1)}{ratio.unit}</span>
-                                            <RatioStatusIcon status={ratio.status} />
+                            <CardContent className="space-y-3">
+                                {ratios.slice(0, 4).map(ratio => (
+                                    <div key={ratio.name} className="flex justify-between items-center">
+                                        <span className="text-xs text-muted-foreground truncate">{ratio.name}</span>
+                                        <div className="flex items-center gap-1">
+                                            <span className="font-mono font-bold text-sm">{ratio.value.toFixed(1)}{ratio.unit}</span>
+                                            <RatioStatusIcon status={ratio.status} size={14} />
                                         </div>
                                     </div>
                                 ))}
@@ -669,6 +677,35 @@ export default function Dashboard() {
                         </Card>
                     </div>
                 </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Compte de Résultat</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table className="text-sm">
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="text-xs">Compte</TableHead>
+                                    <TableHead className="text-right text-xs">Montant</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {incomeStatement.map((item) => (
+                                    <TableRow key={item.accountNumber}>
+                                        <TableCell className="text-xs">
+                                            <span className="font-mono font-bold mr-2">{item.accountNumber}</span>
+                                            <span className="text-muted-foreground">{item.accountName}</span>
+                                        </TableCell>
+                                        <TableCell className={cn("text-right font-mono text-xs", item.amount < 0 ? "text-emerald-600" : "text-red-600")}>
+                                            {item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 0 })}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
             </TabsContent>
           </Tabs>
         </div>

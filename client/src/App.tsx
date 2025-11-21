@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DataProvider } from "@/lib/data-context";
 import Dashboard from "@/pages/dashboard";
 import UploadPage from "@/pages/upload";
+import RatiosDocumentation from "@/pages/ratios-documentation";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -13,6 +14,7 @@ function Router() {
     <Switch>
       <Route path="/" component={UploadPage} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/ratios" component={RatiosDocumentation} />
       <Route component={NotFound} />
     </Switch>
   );
