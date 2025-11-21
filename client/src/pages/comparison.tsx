@@ -45,7 +45,18 @@ export default function ComparisonPage() {
       }
       
       const amount = txn.debit - txn.credit;
-      dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+      
+      // For accounts 1xxx and 2xxx (balance sheet accounts), include prior year balance
+      if (categoryCode.startsWith('1') || categoryCode.startsWith('2')) {
+        dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+        if (year > years[0]) {
+          // Also add prior year amount for cumulative view
+          const priorYearAmount = dataByCategory[key][year - 1] || 0;
+          dataByCategory[key][year] = dataByCategory[key][year] + priorYearAmount;
+        }
+      } else {
+        dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+      }
     });
 
     // Transform to recharts format

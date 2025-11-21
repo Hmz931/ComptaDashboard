@@ -645,16 +645,16 @@ export default function Dashboard() {
                           </CardHeader>
                           <CardContent>
                                 {pieChartDataCharges.length > 0 ? (
-                                    <div className="w-full aspect-square flex items-center justify-center">
+                                    <div style={{ width: '100%', height: '450px' }}>
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
                                                 <Pie
                                                     data={pieChartDataCharges}
                                                     cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={30}
-                                                    outerRadius={60}
-                                                    paddingAngle={3}
+                                                    cy="45%"
+                                                    innerRadius={40}
+                                                    outerRadius={80}
+                                                    paddingAngle={2}
                                                     dataKey="value"
                                                 >
                                                     {pieChartDataCharges.map((entry, index) => (
@@ -662,12 +662,12 @@ export default function Dashboard() {
                                                     ))}
                                                 </Pie>
                                                 <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
-                                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center aspect-square text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                                    <div className="flex items-center justify-center h-[450px] text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
                                         Aucune donnée
                                     </div>
                                 )}
@@ -680,16 +680,16 @@ export default function Dashboard() {
                           </CardHeader>
                           <CardContent>
                                 {pieChartDataProduits.length > 0 ? (
-                                    <div className="w-full aspect-square flex items-center justify-center">
+                                    <div style={{ width: '100%', height: '450px' }}>
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
                                                 <Pie
                                                     data={pieChartDataProduits}
                                                     cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={30}
-                                                    outerRadius={60}
-                                                    paddingAngle={3}
+                                                    cy="45%"
+                                                    innerRadius={40}
+                                                    outerRadius={80}
+                                                    paddingAngle={2}
                                                     dataKey="value"
                                                 >
                                                     {pieChartDataProduits.map((entry, index) => (
@@ -697,12 +697,12 @@ export default function Dashboard() {
                                                     ))}
                                                 </Pie>
                                                 <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
-                                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center aspect-square text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                                    <div className="flex items-center justify-center h-[450px] text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
                                         Aucune donnée
                                     </div>
                                 )}
@@ -743,8 +743,8 @@ export default function Dashboard() {
                         <TableBody>
                             {filteredData.filter(txn => 
                               !detailsSearchTerm || 
-                              txn.accountNumber.toLowerCase().includes(detailsSearchTerm) ||
-                              txn.accountName.toLowerCase().includes(detailsSearchTerm) ||
+                              (txn.accountNumber?.toLowerCase().includes(detailsSearchTerm) ?? false) ||
+                              (txn.accountName?.toLowerCase().includes(detailsSearchTerm) ?? false) ||
                               txn.description.toLowerCase().includes(detailsSearchTerm) ||
                               format(parseISO(txn.date), "dd.MM.yyyy").includes(detailsSearchTerm)
                             ).slice(0, 500).map((txn) => (
@@ -762,9 +762,9 @@ export default function Dashboard() {
                             ))}
                             {filteredData.filter(txn => 
                               !detailsSearchTerm || 
-                              txn.accountNumber.toLowerCase().includes(detailsSearchTerm) ||
-                              txn.accountName.toLowerCase().includes(detailsSearchTerm) ||
-                              txn.description.toLowerCase().includes(detailsSearchTerm) ||
+                              (txn.accountNumber?.toLowerCase().includes(detailsSearchTerm) ?? false) ||
+                              (txn.accountName?.toLowerCase().includes(detailsSearchTerm) ?? false) ||
+                              (txn.description?.toLowerCase().includes(detailsSearchTerm) ?? false) ||
                               format(parseISO(txn.date), "dd.MM.yyyy").includes(detailsSearchTerm)
                             ).length > 500 && (
                                 <TableRow>
