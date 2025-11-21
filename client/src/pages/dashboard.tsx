@@ -396,11 +396,43 @@ export default function Dashboard() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.keys(CATEGORIES).map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
+                    {Object.keys(CATEGORIES).map((cat) => {
+                      const categoryPattern = CATEGORIES[cat as keyof typeof CATEGORIES];
+                      const accountsInCategory = accounts.filter(acc => new RegExp(categoryPattern).test(acc.number));
+                      return (
+                        <div key={cat}>
+                          <SelectItem value={cat}>
+                            {cat}
+                          </SelectItem>
+                          {accountsInCategory.length > 0 && selectedCategory === cat && (
+                            <div className="ml-6 text-xs space-y-1 mb-2 mt-1 border-l border-muted pl-2">
+                              {accountsInCategory.map(acc => (
+                                <div key={acc.id} className="flex items-center space-x-2 py-1">
+                                  <Checkbox 
+                                    id={`subcat-${acc.id}`}
+                                    checked={selectedAccounts.includes(acc.id)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedAccounts([...selectedAccounts, acc.id]);
+                                      } else {
+                                        setSelectedAccounts(selectedAccounts.filter(id => id !== acc.id));
+                                      }
+                                    }}
+                                  />
+                                  <label 
+                                    htmlFor={`subcat-${acc.id}`}
+                                    className="text-xs leading-none cursor-pointer truncate"
+                                    title={acc.name}
+                                  >
+                                    <span className="font-mono font-bold text-[10px]">{acc.number}</span> <span className="text-[10px]">{acc.name}</span>
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
