@@ -6,7 +6,7 @@ import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { parseISO } from "date-fns";
-import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS } from "@/lib/mockData";
+import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, CATEGORIE_LABELS } from "@/lib/mockData";
 
 export default function ComparisonPage() {
   const { data } = useData();
@@ -14,9 +14,9 @@ export default function ComparisonPage() {
   
   const accounts = data?.accounts || MOCK_ACCOUNTS;
   const transactions = data?.transactions || MOCK_TRANSACTIONS;
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
-  // Extract years and build comparison data
+  // Extract years and build comparison data by category
   const comparisonData = useMemo(() => {
     const yearsSet = new Set<number>();
     const accountsMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
@@ -27,35 +27,39 @@ export default function ComparisonPage() {
 
     const years = Array.from(yearsSet).sort();
     
-    // Build data structure: for each account, sum amounts by year
-    const dataByAccount: Record<string, Record<number, number>> = {};
+    // Build data structure: for each category, sum amounts by year
+    const dataByCategory: Record<string, Record<number, number>> = {};
     
     transactions.forEach(txn => {
       const year = new Date(parseISO(txn.date)).getFullYear();
       const accountInfo = accountsMap.get(txn.accountId);
       if (!accountInfo) return;
       
-      const key = `${accountInfo.number} - ${accountInfo.name}`;
-      if (!dataByAccount[key]) {
-        dataByAccount[key] = {};
+      // Get first 2 digits (category code)
+      const categoryCode = accountInfo.number.substring(0, 2);
+      const categoryLabel = CATEGORIE_LABELS[categoryCode] || `Catégorie ${categoryCode}`;
+      const key = `${categoryCode} - ${categoryLabel}`;
+      
+      if (!dataByCategory[key]) {
+        dataByCategory[key] = {};
       }
       
       const amount = txn.debit - txn.credit;
-      dataByAccount[key][year] = (dataByAccount[key][year] || 0) + amount;
+      dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
     });
 
     // Transform to recharts format
     const chartData = years.map(year => ({
       year: year.toString(),
       ...Object.fromEntries(
-        Object.entries(dataByAccount).map(([account, data]) => [
-          account,
+        Object.entries(dataByCategory).map(([category, data]) => [
+          category,
           Math.abs(data[year] || 0)
         ])
       )
     }));
 
-    return { chartData, years, accountsMap, allAccounts: Object.keys(dataByAccount) };
+    return { chartData, years, accountsMap, allCategories: Object.keys(dataByCategory).sort() };
   }, [transactions, accounts]);
 
   // Colors for bars
@@ -67,9 +71,9 @@ export default function ComparisonPage() {
     'hsl(var(--chart-5))',
   ];
 
-  const displayAccounts = selectedAccounts.length > 0 
-    ? selectedAccounts 
-    : comparisonData.allAccounts;
+  const displayCategories = selectedCategories.length > 0 
+    ? selectedCategories 
+    : comparisonData.allCategories;
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -80,15 +84,15 @@ export default function ComparisonPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold">Comparaison Annuelle</h1>
-            <p className="text-muted-foreground">Analyse comparative des montants par année</p>
+            <p className="text-muted-foreground">Analyse comparative des catégories par année</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <Card className="lg:col-span-3">
             <CardHeader>
-              <CardTitle>Montants par Année et Compte</CardTitle>
-              <CardDescription>Sélectionnez les comptes à afficher pour une comparaison détaillée</CardDescription>
+              <CardTitle>Montants par Année et Catégorie</CardTitle>
+              <CardDescription>Sélectionnez les catégories à afficher pour une comparaison détaillée</CardDescription>
             </CardHeader>
             <CardContent>
               {comparisonData.chartData.length > 0 ? (
@@ -98,9 +102,9 @@ export default function ComparisonPage() {
                     <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
                     <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
-                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    {displayAccounts.map((account, index) => (
-                      <Bar key={account} dataKey={account} fill={COLORS[index % COLORS.length]} />
+                    <Legend wrapperStyle={{ fontSize: '11px', maxHeight: '100px' }} />
+                    {displayCategories.map((category, index) => (
+                      <Bar key={category} dataKey={category} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -114,34 +118,34 @@ export default function ComparisonPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Sélection Comptes</CardTitle>
+              <CardTitle className="text-lg">Sélection Catégories</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="max-h-[400px] overflow-y-auto space-y-2">
-                {comparisonData.allAccounts.map((account, idx) => (
-                  <label key={account} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-muted rounded">
+              <div className="max-h-[450px] overflow-y-auto space-y-2">
+                {comparisonData.allCategories.map((category) => (
+                  <label key={category} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-muted rounded">
                     <input
                       type="checkbox"
-                      checked={selectedAccounts.includes(account)}
+                      checked={selectedCategories.includes(category)}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedAccounts([...selectedAccounts, account]);
+                          setSelectedCategories([...selectedCategories, category]);
                         } else {
-                          setSelectedAccounts(selectedAccounts.filter(a => a !== account));
+                          setSelectedCategories(selectedCategories.filter(a => a !== category));
                         }
                       }}
                       className="w-4 h-4"
                     />
-                    <span className="text-xs">{account.split(' - ')[0]}</span>
+                    <span className="text-xs">{category}</span>
                   </label>
                 ))}
               </div>
-              {selectedAccounts.length > 0 && (
+              {selectedCategories.length > 0 && (
                 <Button 
                   size="sm" 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => setSelectedAccounts([])}
+                  onClick={() => setSelectedCategories([])}
                 >
                   Réinitialiser
                 </Button>
