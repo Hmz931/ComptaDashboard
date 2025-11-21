@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ACCOUNTS, TRANSACTIONS, BALANCE_SHEET, INCOME_STATEMENT, CATEGORIES } from "@/lib/mockData";
+import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, BALANCE_SHEET as MOCK_BALANCE_SHEET, INCOME_STATEMENT as MOCK_INCOME_STATEMENT, CATEGORIES } from "@/lib/mockData";
 import { format, parseISO, startOfYear, endOfYear } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,10 +10,29 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Download, Filter, TrendingUp, Wallet, FileText } from "lucide-react";
+import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useData } from "@/lib/data-context";
+import { useLocation } from "wouter";
+import * as XLSX from "xlsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Dashboard() {
+  const { data } = useData();
+  const [, setLocation] = useLocation();
+
+  // Fallback to mock data if no context data (e.g. direct access)
+  // In a real app, we might redirect to upload.
+  const accounts = data?.accounts || MOCK_ACCOUNTS;
+  const transactions = data?.transactions || MOCK_TRANSACTIONS;
+  const balanceSheet = data?.balanceSheet || MOCK_BALANCE_SHEET;
+  const incomeStatement = data?.incomeStatement || MOCK_INCOME_STATEMENT;
+  
   const [selectedCategory, setSelectedCategory] = useState<string>("Tous les comptes");
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -21,14 +40,51 @@ export default function Dashboard() {
     to: endOfYear(new Date()),
   });
 
+  const handleDownloadCleanGL = () => {
+      if (!data?.processedFiles?.cleanGL) return;
+      const ws = XLSX.utils.json_to_sheet(data.processedFiles.cleanGL);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Grand Livre Clean");
+      XLSX.writeFile(wb, "Comptes_Cleans.xlsx");
+  };
+
+  const handleDownloadFinancialStatements = () => {
+      if (!data?.processedFiles?.financialStatements) return;
+      
+      const wb = XLSX.utils.book_new();
+      
+      // Balance Sheet
+      const wsBS = XLSX.utils.json_to_sheet(data.processedFiles.financialStatements.balanceSheet);
+      XLSX.utils.book_append_sheet(wb, wsBS, "Balance Sheet");
+      
+      // Income Statement
+      const wsIS = XLSX.utils.json_to_sheet(data.processedFiles.financialStatements.incomeStatement);
+      XLSX.utils.book_append_sheet(wb, wsIS, "Income Statement");
+      
+      XLSX.writeFile(wb, "Financial_Statements.xlsx");
+  };
+  
+  const handleDownloadPlanComptable = () => {
+       if (!data?.processedFiles?.planComptable) return;
+       const ws = XLSX.utils.json_to_sheet(data.processedFiles.planComptable);
+       const wb = XLSX.utils.book_new();
+       XLSX.utils.book_append_sheet(wb, ws, "Plan Comptable");
+       XLSX.writeFile(wb, "Plan_Comptable.xlsx");
+  };
+
+
   // Filter Logic
   const filteredData = useMemo(() => {
     const pattern = new RegExp(CATEGORIES[selectedCategory as keyof typeof CATEGORIES]);
     
     // 1. Filter Accounts based on Category and Selection
-    const relevantAccounts = ACCOUNTS.filter(acc => {
+    const relevantAccounts = accounts.filter(acc => {
         if (selectedAccounts.length > 0) {
             return selectedAccounts.includes(acc.id);
+        }
+        // Use category if available, else try to match number regex
+        if (acc.category && CATEGORIES[selectedCategory as keyof typeof CATEGORIES] !== ".*") {
+             return acc.category === selectedCategory || pattern.test(acc.number);
         }
         return pattern.test(acc.number);
     });
@@ -36,7 +92,7 @@ export default function Dashboard() {
     const relevantAccountIds = new Set(relevantAccounts.map(a => a.id));
 
     // 2. Filter Transactions
-    let txns = TRANSACTIONS.filter(t => relevantAccountIds.has(t.accountId));
+    let txns = transactions.filter(t => relevantAccountIds.has(t.accountId));
     
     if (dateRange?.from && dateRange?.to) {
         txns = txns.filter(t => {
@@ -57,7 +113,7 @@ export default function Dashboard() {
         const movement = txn.debit - txn.credit;
         accountBalances[txn.accountId] = (accountBalances[txn.accountId] || 0) + movement;
         
-        const account = ACCOUNTS.find(a => a.id === txn.accountId);
+        const account = accounts.find(a => a.id === txn.accountId);
         
         txnsWithBalance.push({
             ...txn,
@@ -69,22 +125,15 @@ export default function Dashboard() {
     }
 
     return txnsWithBalance;
-  }, [selectedCategory, selectedAccounts, dateRange]);
+  }, [selectedCategory, selectedAccounts, dateRange, accounts, transactions]);
 
   // Chart Data Preparation
   const chartData = useMemo(() => {
-    // For the chart, we might want to aggregate by date or just show points
-    // If too many points, it might be messy. Let's just map the filtered transactions.
     return filteredData.map(t => ({
         date: format(parseISO(t.date), "dd.MM.yyyy"),
         timestamp: new Date(t.date).getTime(),
         balance: t.cumulativeBalance,
         account: `${t.accountNumber} - ${t.accountName}`,
-        // Recharts needs unique keys if we want multiple lines. 
-        // But here we might just want to show the flow.
-        // If multiple accounts are selected, we probably want multiple lines.
-        // For simplicity in this mockup, let's flatten data for the chart to show 'Total Movement' if multiple, or individual lines?
-        // The Streamlit app used `color='compte'`, so it showed multiple lines.
         [t.accountNumber!]: t.cumulativeBalance
     }));
   }, [filteredData]);
@@ -109,7 +158,7 @@ export default function Dashboard() {
       })).sort((a, b) => Math.abs(b.variation) - Math.abs(a.variation));
   }, [filteredData]);
 
-  const netResult = INCOME_STATEMENT.reduce((acc, item) => acc + item.amount, 0);
+  const netResult = incomeStatement.reduce((acc, item) => acc + item.amount, 0);
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground p-6 space-y-8">
@@ -125,9 +174,30 @@ export default function Dashboard() {
           <p className="text-muted-foreground mt-2 text-lg">Suivi Évolution des Comptes</p>
         </div>
         <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" /> Exporter
-            </Button>
+            {!data && (
+                 <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
+                    <UploadPageIcon className="mr-2 h-4 w-4" /> Nouvel Import
+                 </Button>
+            )}
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="default" size="sm">
+                    <Download className="mr-2 h-4 w-4" /> Exporter Rapports
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleDownloadCleanGL} disabled={!data}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Comptes_Cleans.xlsx
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadFinancialStatements} disabled={!data}>
+                    <FileText className="mr-2 h-4 w-4" /> Financial_Statements.xlsx
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadPlanComptable} disabled={!data}>
+                    <FileText className="mr-2 h-4 w-4" /> Plan_Comptable.xlsx
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
         </div>
       </div>
 
@@ -311,7 +381,7 @@ export default function Dashboard() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {BALANCE_SHEET.map((item) => (
+                                    {balanceSheet.map((item) => (
                                         <TableRow key={item.accountNumber}>
                                             <TableCell>{item.accountNumber} - {item.accountName}</TableCell>
                                             <TableCell className="text-right font-mono">{item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}</TableCell>
@@ -335,7 +405,7 @@ export default function Dashboard() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {INCOME_STATEMENT.map((item) => (
+                                    {incomeStatement.map((item) => (
                                         <TableRow key={item.accountNumber}>
                                             <TableCell>{item.accountNumber} - {item.accountName}</TableCell>
                                             <TableCell className={cn("text-right font-mono", item.amount < 0 ? "text-red-500" : "")}>
@@ -361,4 +431,25 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+function UploadPageIcon(props: any) {
+    return (
+        <svg
+            {...props}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" x2="12" y1="3" y2="15" />
+        </svg>
+    )
 }
