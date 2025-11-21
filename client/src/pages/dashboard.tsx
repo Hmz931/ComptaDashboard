@@ -331,7 +331,7 @@ export default function Dashboard() {
                 <div className="p-2 bg-primary/10 rounded-lg text-primary">
                     <TrendingUp className="h-8 w-8" />
                 </div>
-                HBO Analytics
+                ComptaDashboard
               </h1>
               <p className="text-muted-foreground mt-1 text-sm">Suivi Évolution des Comptes • {filteredData.length} écritures</p>
             </div>
