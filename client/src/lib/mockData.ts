@@ -117,7 +117,7 @@ export const CATEGORIES = {
 };
 
 export const CATEGORIE_LABELS: Record<string, string> = {
-  "10": "Disponibilités et trésorerie",
+  "10": "Disponibilités",
   "11": "Créances clients",
   "12": "Stocks",
   "13": "Régularisation actif",

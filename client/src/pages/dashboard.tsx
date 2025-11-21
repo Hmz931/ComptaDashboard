@@ -644,8 +644,8 @@ export default function Dashboard() {
                           </CardHeader>
                           <CardContent>
                                 {pieChartDataCharges.length > 0 ? (
-                                    <div className="w-full" style={{ minHeight: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <ResponsiveContainer width="100%" height={250}>
+                                    <div className="w-full aspect-square flex items-center justify-center">
+                                        <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
                                                 <Pie
                                                     data={pieChartDataCharges}
@@ -666,7 +666,7 @@ export default function Dashboard() {
                                         </ResponsiveContainer>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center h-[250px] text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                                    <div className="flex items-center justify-center aspect-square text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
                                         Aucune donnée
                                     </div>
                                 )}
@@ -679,8 +679,8 @@ export default function Dashboard() {
                           </CardHeader>
                           <CardContent>
                                 {pieChartDataProduits.length > 0 ? (
-                                    <div className="w-full" style={{ minHeight: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <ResponsiveContainer width="100%" height={250}>
+                                    <div className="w-full aspect-square flex items-center justify-center">
+                                        <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
                                                 <Pie
                                                     data={pieChartDataProduits}
@@ -701,7 +701,7 @@ export default function Dashboard() {
                                         </ResponsiveContainer>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center h-[250px] text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                                    <div className="flex items-center justify-center aspect-square text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
                                         Aucune donnée
                                     </div>
                                 )}
