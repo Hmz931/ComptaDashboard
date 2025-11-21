@@ -40,7 +40,7 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string>("Tous les comptes");
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedYearsForCharts, setSelectedYearsForCharts] = useState<number[]>([]);
-  const [tempSelectedAccounts, setTempSelectedAccounts] = useState<string[]>([]);
+  const [accountSearchTerm, setAccountSearchTerm] = useState<string>("");
 
   // Extract available years from transactions
   const availableYears = useMemo(() => {
@@ -402,18 +402,31 @@ export default function Dashboard() {
               </div>
 
               <div className="space-y-2">
-                 <label className="text-sm font-medium">Tous les Comptes</label>
-                 <div className="max-h-[250px] overflow-y-auto border rounded-md p-2 space-y-1 bg-background">
-                    {accounts.map(acc => (
+                 <label className="text-sm font-medium">Recherche Comptes</label>
+                 <input 
+                    type="text" 
+                    placeholder="Chercher par #, nom..." 
+                    value={accountSearchTerm}
+                    onChange={(e) => setAccountSearchTerm(e.target.value)}
+                    className="w-full px-2 py-1 text-xs border rounded-md bg-background"
+                 />
+                 <div className="max-h-[300px] overflow-y-auto border rounded-md p-2 space-y-1 bg-background">
+                    {accounts
+                        .filter(acc => 
+                            accountSearchTerm === "" || 
+                            acc.number.toLowerCase().includes(accountSearchTerm.toLowerCase()) ||
+                            acc.name.toLowerCase().includes(accountSearchTerm.toLowerCase())
+                        )
+                        .map(acc => (
                         <div key={acc.id} className="flex items-center space-x-2">
                             <Checkbox 
                                 id={`acc-${acc.id}`} 
-                                checked={tempSelectedAccounts.includes(acc.id)}
+                                checked={selectedAccounts.includes(acc.id)}
                                 onCheckedChange={(checked) => {
                                     if (checked) {
-                                        setTempSelectedAccounts([...tempSelectedAccounts, acc.id]);
+                                        setSelectedAccounts([...selectedAccounts, acc.id]);
                                     } else {
-                                        setTempSelectedAccounts(tempSelectedAccounts.filter(id => id !== acc.id));
+                                        setSelectedAccounts(selectedAccounts.filter(id => id !== acc.id));
                                     }
                                 }}
                             />
@@ -427,14 +440,22 @@ export default function Dashboard() {
                         </div>
                     ))}
                  </div>
-                 <div className="flex gap-2 pt-2">
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setTempSelectedAccounts([])}>
-                      Réinitialiser
-                    </Button>
-                    <Button size="sm" className="h-7 text-xs flex-1" onClick={() => { setSelectedAccounts(tempSelectedAccounts); setSelectedCategory("Tous les comptes"); }}>
-                      Appliquer
-                    </Button>
-                 </div>
+                 {selectedAccounts.length > 0 && (
+                    <div className="mt-2 p-2 bg-muted rounded-md">
+                        <p className="text-xs font-medium mb-1">Comptes sélectionnés ({selectedAccounts.length}):</p>
+                        <div className="flex flex-wrap gap-1">
+                            {selectedAccounts.map(id => {
+                                const acc = accounts.find(a => a.id === id);
+                                return acc ? (
+                                    <span key={id} className="inline-flex items-center gap-1 bg-primary/20 text-primary text-[10px] px-2 py-1 rounded">
+                                        {acc.number}
+                                        <button onClick={() => setSelectedAccounts(selectedAccounts.filter(a => a !== id))} className="ml-1 hover:opacity-70">×</button>
+                                    </span>
+                                ) : null;
+                            })}
+                        </div>
+                    </div>
+                 )}
               </div>
 
               <div className="space-y-2">
@@ -585,16 +606,16 @@ export default function Dashboard() {
                         </CardContent>
                       </Card>
                       
-                      <div className="space-y-4">
-                          <div className="flex gap-2 items-center">
-                              <label className="text-sm font-medium">Années:</label>
-                              <div className="flex gap-2 flex-wrap">
+                      <div className="space-y-3">
+                          <div>
+                              <label className="text-sm font-medium block mb-2">Années pour graphiques:</label>
+                              <div className="flex gap-1 flex-wrap p-2 border rounded-md bg-muted/30">
                                   {availableYears.map(year => (
                                       <Button
                                           key={year}
                                           size="sm"
                                           variant={selectedYearsForCharts.includes(year) ? "default" : "outline"}
-                                          className="h-7 px-2 text-xs"
+                                          className="h-6 px-2 text-xs"
                                           onClick={() => {
                                               if (selectedYearsForCharts.includes(year)) {
                                                   setSelectedYearsForCharts(selectedYearsForCharts.filter(y => y !== year));
@@ -607,6 +628,9 @@ export default function Dashboard() {
                                       </Button>
                                   ))}
                               </div>
+                              {selectedYearsForCharts.length === 0 && (
+                                  <p className="text-[10px] text-red-500 mt-1">Sélectionnez au moins une année</p>
+                              )}
                           </div>
                       </div>
 
