@@ -312,15 +312,10 @@ export const processGLFile = async (file: File): Promise<{
     // Classify and Populate
     allAccounts.forEach(acc => {
         const firstDigit = acc.number[0];
-        let net = accountYearlyNet[acc.id];
+        const net = accountYearlyNet[acc.id];
         
         if (['1', '2'].includes(firstDigit)) {
              // Balance Sheet
-             // Assets (1): Debit = Positive (Debit - Credit)
-             // Liabilities (2): Credit = Positive (Credit - Debit) => Invert sign
-             if (firstDigit === '2') {
-                 net = -net; // Invert sign for Liabilities
-             }
              balanceSheetItems.push({
                  accountNumber: acc.number,
                  accountName: acc.name,
@@ -328,11 +323,6 @@ export const processGLFile = async (file: File): Promise<{
              });
         } else if (['3', '4', '5', '6', '7', '8'].includes(firstDigit)) {
             // Income Statement
-            // Revenues (3): Credit = Positive (Credit - Debit) => Invert sign
-            // Expenses (4-8): Debit = Positive (Debit - Credit)
-            if (firstDigit === '3') {
-                net = -net; // Invert sign for Revenues
-            }
             incomeStatementItems.push({
                 accountNumber: acc.number,
                 accountName: acc.name,

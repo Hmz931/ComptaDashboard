@@ -870,7 +870,7 @@ export default function Dashboard() {
                                                 <TableRow key={item.accountNumber}>
                                                     <TableCell className="text-xs"><span className="font-mono font-bold">{item.accountNumber}</span></TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">{item.accountName}</TableCell>
-                                                    <TableCell className="text-right font-mono text-xs">{item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 0 })}</TableCell>
+                                                    <TableCell className="text-right font-mono text-xs">{Math.abs(item.amount).toLocaleString('fr-CH', { minimumFractionDigits: 0 })}</TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
