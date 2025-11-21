@@ -32,6 +32,7 @@ export default function ComparisonPage() {
     
     // Build data structure: for each category, sum amounts by year
     const dataByCategory: Record<string, Record<number, number>> = {};
+    const dataBySubAccount: Record<string, Record<number, number>> = {};
     const subAccountsByCategory: Record<string, { id: string, number: string, name: string }[]> = {};
     
     transactions.forEach(txn => {
@@ -43,13 +44,18 @@ export default function ComparisonPage() {
       const categoryCode = accountInfo.number.substring(0, 2);
       const categoryLabel = CATEGORIE_LABELS[categoryCode] || `Catégorie ${categoryCode}`;
       const key = `${categoryCode} - ${categoryLabel}`;
+      const subAccountKey = `${accountInfo.number} - ${accountInfo.name}`;
       
       if (!dataByCategory[key]) {
         dataByCategory[key] = {};
       }
+      if (!dataBySubAccount[subAccountKey]) {
+        dataBySubAccount[subAccountKey] = {};
+      }
       
       const amount = txn.debit - txn.credit;
       dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+      dataBySubAccount[subAccountKey][year] = (dataBySubAccount[subAccountKey][year] || 0) + amount;
     });
 
     // Build sub-accounts list for each category
@@ -66,20 +72,35 @@ export default function ComparisonPage() {
 
     // For balance sheet accounts (1xxx, 2xxx), calculate cumulative balances
     const finalDataByCategory: Record<string, Record<number, number>> = {};
+    const finalDataBySubAccount: Record<string, Record<number, number>> = {};
+    
     Object.entries(dataByCategory).forEach(([category, yearData]) => {
       const categoryCode = category.substring(0, 2);
       finalDataByCategory[category] = {};
       
       if (categoryCode.startsWith('1') || categoryCode.startsWith('2')) {
-        // Cumulative for balance sheet: each year = all prior years + current year
         let cumulative = 0;
         years.forEach(year => {
           cumulative += yearData[year] || 0;
           finalDataByCategory[category][year] = cumulative;
         });
       } else {
-        // For income statement accounts, just use annual amounts
         finalDataByCategory[category] = yearData;
+      }
+    });
+
+    Object.entries(dataBySubAccount).forEach(([subAccount, yearData]) => {
+      const categoryCode = subAccount.substring(0, 2);
+      finalDataBySubAccount[subAccount] = {};
+      
+      if (categoryCode.startsWith('1') || categoryCode.startsWith('2')) {
+        let cumulative = 0;
+        years.forEach(year => {
+          cumulative += yearData[year] || 0;
+          finalDataBySubAccount[subAccount][year] = cumulative;
+        });
+      } else {
+        finalDataBySubAccount[subAccount] = yearData;
       }
     });
 
@@ -89,6 +110,12 @@ export default function ComparisonPage() {
       ...Object.fromEntries(
         Object.entries(finalDataByCategory).map(([category, data]) => [
           category,
+          Math.abs(data[year] || 0)
+        ])
+      ),
+      ...Object.fromEntries(
+        Object.entries(finalDataBySubAccount).map(([subAccount, data]) => [
+          subAccount,
           Math.abs(data[year] || 0)
         ])
       )
@@ -112,9 +139,19 @@ export default function ComparisonPage() {
     'hsl(var(--chart-5))',
   ];
 
-  const displayCategories = selectedCategories.length > 0 
-    ? selectedCategories 
-    : comparisonData.allCategories;
+  // Build display categories: show selected categories OR all categories
+  // If sub-accounts are selected, show only those sub-accounts
+  const displayCategories = useMemo(() => {
+    if (selectedSubAccounts.length > 0) {
+      return selectedSubAccounts
+        .map(id => {
+          const acc = accounts.find(a => a.id === id);
+          return acc ? `${acc.number} - ${acc.name}` : null;
+        })
+        .filter(Boolean) as string[];
+    }
+    return selectedCategories.length > 0 ? selectedCategories : comparisonData.allCategories;
+  }, [selectedSubAccounts, selectedCategories, comparisonData.allCategories, accounts]);
 
   return (
     <div className="min-h-screen bg-background p-6">
