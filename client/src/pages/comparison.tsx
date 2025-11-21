@@ -45,17 +45,25 @@ export default function ComparisonPage() {
       }
       
       const amount = txn.debit - txn.credit;
+      dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+    });
+
+    // For balance sheet accounts (1xxx, 2xxx), calculate cumulative balances
+    const finalDataByCategory: Record<string, Record<number, number>> = {};
+    Object.entries(dataByCategory).forEach(([category, yearData]) => {
+      const categoryCode = category.substring(0, 2);
+      finalDataByCategory[category] = {};
       
-      // For accounts 1xxx and 2xxx (balance sheet accounts), include prior year balance
       if (categoryCode.startsWith('1') || categoryCode.startsWith('2')) {
-        dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
-        if (year > years[0]) {
-          // Also add prior year amount for cumulative view
-          const priorYearAmount = dataByCategory[key][year - 1] || 0;
-          dataByCategory[key][year] = dataByCategory[key][year] + priorYearAmount;
-        }
+        // Cumulative for balance sheet: each year = all prior years + current year
+        let cumulative = 0;
+        years.forEach(year => {
+          cumulative += yearData[year] || 0;
+          finalDataByCategory[category][year] = cumulative;
+        });
       } else {
-        dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+        // For income statement accounts, just use annual amounts
+        finalDataByCategory[category] = yearData;
       }
     });
 
@@ -63,14 +71,14 @@ export default function ComparisonPage() {
     const chartData = years.map(year => ({
       year: year.toString(),
       ...Object.fromEntries(
-        Object.entries(dataByCategory).map(([category, data]) => [
+        Object.entries(finalDataByCategory).map(([category, data]) => [
           category,
           Math.abs(data[year] || 0)
         ])
       )
     }));
 
-    return { chartData, years, accountsMap, allCategories: Object.keys(dataByCategory).sort() };
+    return { chartData, years, accountsMap, allCategories: Object.keys(finalDataByCategory).sort() };
   }, [transactions, accounts]);
 
   // Colors for bars

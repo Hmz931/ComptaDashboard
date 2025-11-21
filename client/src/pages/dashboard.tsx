@@ -656,6 +656,11 @@ export default function Dashboard() {
                                                     outerRadius={80}
                                                     paddingAngle={2}
                                                     dataKey="value"
+                                                    label={({ value, name }) => {
+                                                      const total = pieChartDataCharges.reduce((sum, item) => sum + item.value, 0);
+                                                      const percentage = ((value / total) * 100).toFixed(1);
+                                                      return `${percentage}%`;
+                                                    }}
                                                 >
                                                     {pieChartDataCharges.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
