@@ -39,7 +39,22 @@ export default function Dashboard() {
   
   const [selectedCategory, setSelectedCategory] = useState<string>("Tous les comptes");
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  
+  const [selectedYearsForCharts, setSelectedYearsForCharts] = useState<number[]>([]);
+  const [tempSelectedAccounts, setTempSelectedAccounts] = useState<string[]>([]);
+
+  // Extract available years from transactions
+  const availableYears = useMemo(() => {
+    const years = new Set(transactions.map(t => new Date(parseISO(t.date)).getFullYear()));
+    return Array.from(years).sort((a, b) => a - b);
+  }, [transactions]);
+
+  // Initialize selected years on first load
+  useEffect(() => {
+    if (selectedYearsForCharts.length === 0 && availableYears.length > 0) {
+      setSelectedYearsForCharts(availableYears);
+    }
+  }, [availableYears.length > 0]);
+
   // Calculate default date range from actual data
   const defaultDateRange = useMemo(() => {
     if (transactions.length === 0) {
@@ -235,7 +250,7 @@ export default function Dashboard() {
       })).sort((a, b) => Math.abs(b.variation) - Math.abs(a.variation));
   }, [filteredData]);
 
-  // Pie Chart Data (Charges per Category)
+  // Pie Chart Data (Charges per Category) - filtered by selected years, NO date range restriction
   const pieChartDataCharges = useMemo(() => {
       const data: Record<string, number> = {
           "Coûts directs (4xxx)": 0,
@@ -243,22 +258,31 @@ export default function Dashboard() {
           "Autres charges (6xxx)": 0
       };
 
-      // We can use Income Statement items
-      incomeStatement.forEach(item => {
-          const firstDigit = item.accountNumber[0];
-          if (firstDigit === '4') data["Coûts directs (4xxx)"] += item.amount;
-          if (firstDigit === '5') data["Charges de personnel (5xxx)"] += item.amount;
-          if (firstDigit === '6') data["Autres charges (6xxx)"] += item.amount;
+      // Filter transactions by selected years
+      const selectedYearsSet = new Set(selectedYearsForCharts);
+      const accountMap = new Map(accounts.map(a => [a.id, a.number]));
+      
+      transactions.forEach(txn => {
+          const year = new Date(parseISO(txn.date)).getFullYear();
+          if (!selectedYearsSet.has(year)) return;
+
+          const accountNum = accountMap.get(txn.accountId);
+          if (!accountNum) return;
+          const firstDigit = accountNum[0];
+          const isExpense = txn.debit > 0 ? txn.debit : -txn.credit;
+          
+          if (firstDigit === '4') data["Coûts directs (4xxx)"] += isExpense;
+          if (firstDigit === '5') data["Charges de personnel (5xxx)"] += isExpense;
+          if (firstDigit === '6') data["Autres charges (6xxx)"] += isExpense;
       });
 
-      // Note: Expenses are typically Positive (Debit) in our IS calculation from excel-processor
       return Object.entries(data).map(([name, value]) => ({
           name,
           value: Math.abs(value)
       })).filter(i => i.value > 0);
-  }, [incomeStatement]);
+  }, [transactions, selectedYearsForCharts, accounts]);
 
-  // Pie Chart Data (Produits/Revenue per Category)
+  // Pie Chart Data (Produits/Revenue per Category) - filtered by selected years, NO date range restriction
   const pieChartDataProduits = useMemo(() => {
       const data: Record<string, number> = {
           "Ventes (30xx)": 0,
@@ -266,21 +290,30 @@ export default function Dashboard() {
           "Autres produits (32-38xx)": 0
       };
 
-      // Revenue accounts start with 3
-      incomeStatement.forEach(item => {
-          if (item.accountNumber[0] === '3') {
-              const secondDigit = item.accountNumber[1];
-              if (secondDigit === '0') data["Ventes (30xx)"] += Math.abs(item.amount);
-              else if (secondDigit === '1') data["Services (31xx)"] += Math.abs(item.amount);
-              else data["Autres produits (32-38xx)"] += Math.abs(item.amount);
-          }
+      // Filter transactions by selected years
+      const selectedYearsSet = new Set(selectedYearsForCharts);
+      const accountMap = new Map(accounts.map(a => [a.id, a.number]));
+      
+      transactions.forEach(txn => {
+          const year = new Date(parseISO(txn.date)).getFullYear();
+          if (!selectedYearsSet.has(year)) return;
+
+          const accountNum = accountMap.get(txn.accountId);
+          if (!accountNum) return;
+          if (accountNum[0] !== '3') return;
+
+          const revenue = txn.credit > 0 ? txn.credit : -txn.debit;
+          const secondDigit = accountNum[1];
+          if (secondDigit === '0') data["Ventes (30xx)"] += revenue;
+          else if (secondDigit === '1') data["Services (31xx)"] += revenue;
+          else data["Autres produits (32-38xx)"] += revenue;
       });
 
       return Object.entries(data).map(([name, value]) => ({
           name,
           value: Math.abs(value)
       })).filter(i => i.value > 0);
-  }, [incomeStatement]);
+  }, [transactions, selectedYearsForCharts, accounts]);
 
   const PIE_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
 
@@ -369,23 +402,18 @@ export default function Dashboard() {
               </div>
 
               <div className="space-y-2">
-                 <label className="text-sm font-medium">Comptes Spécifiques</label>
-                 <div className="max-h-[200px] overflow-y-auto border rounded-md p-2 space-y-1 bg-background">
-                    {accounts
-                        .filter(a => {
-                             const pattern = new RegExp(CATEGORIES[selectedCategory as keyof typeof CATEGORIES]);
-                             return pattern.test(a.number);
-                        })
-                        .map(acc => (
+                 <label className="text-sm font-medium">Tous les Comptes</label>
+                 <div className="max-h-[250px] overflow-y-auto border rounded-md p-2 space-y-1 bg-background">
+                    {accounts.map(acc => (
                         <div key={acc.id} className="flex items-center space-x-2">
                             <Checkbox 
                                 id={`acc-${acc.id}`} 
-                                checked={selectedAccounts.includes(acc.id)}
+                                checked={tempSelectedAccounts.includes(acc.id)}
                                 onCheckedChange={(checked) => {
                                     if (checked) {
-                                        setSelectedAccounts([...selectedAccounts, acc.id]);
+                                        setTempSelectedAccounts([...tempSelectedAccounts, acc.id]);
                                     } else {
-                                        setSelectedAccounts(selectedAccounts.filter(id => id !== acc.id));
+                                        setTempSelectedAccounts(tempSelectedAccounts.filter(id => id !== acc.id));
                                     }
                                 }}
                             />
@@ -394,12 +422,19 @@ export default function Dashboard() {
                                 className="text-xs leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate cursor-pointer"
                                 title={acc.name}
                             >
-                                <span className="font-mono font-bold">{acc.number}</span> {acc.name}
+                                <span className="font-mono font-bold text-[10px]">{acc.number}</span> <span className="text-[10px]">{acc.name}</span>
                             </label>
                         </div>
                     ))}
                  </div>
-                 <p className="text-[10px] text-muted-foreground">Sélectionnez pour voir le détail individuel.</p>
+                 <div className="flex gap-2 pt-2">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setTempSelectedAccounts([])}>
+                      Réinitialiser
+                    </Button>
+                    <Button size="sm" className="h-7 text-xs flex-1" onClick={() => { setSelectedAccounts(tempSelectedAccounts); setSelectedCategory("Tous les comptes"); }}>
+                      Appliquer
+                    </Button>
+                 </div>
               </div>
 
               <div className="space-y-2">
@@ -550,6 +585,31 @@ export default function Dashboard() {
                         </CardContent>
                       </Card>
                       
+                      <div className="space-y-4">
+                          <div className="flex gap-2 items-center">
+                              <label className="text-sm font-medium">Années:</label>
+                              <div className="flex gap-2 flex-wrap">
+                                  {availableYears.map(year => (
+                                      <Button
+                                          key={year}
+                                          size="sm"
+                                          variant={selectedYearsForCharts.includes(year) ? "default" : "outline"}
+                                          className="h-7 px-2 text-xs"
+                                          onClick={() => {
+                                              if (selectedYearsForCharts.includes(year)) {
+                                                  setSelectedYearsForCharts(selectedYearsForCharts.filter(y => y !== year));
+                                              } else {
+                                                  setSelectedYearsForCharts([...selectedYearsForCharts, year]);
+                                              }
+                                          }}
+                                      >
+                                          {year}
+                                      </Button>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <Card>
                           <CardHeader>
