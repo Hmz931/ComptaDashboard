@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,11 +52,11 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Update dateRange when defaultDateRange changes (e.g., when new data is uploaded)
-  React.useEffect(() => {
+  useEffect(() => {
     if (!dateRange || dateRange.from === undefined || dateRange.to === undefined) {
       setDateRange(defaultDateRange);
     }
-  }, [defaultDateRange]);
+  }, [defaultDateRange]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Helper to parse date for sorting (must be defined before useMemo that uses it)
   const parse = (dateString: string, formatString: string, referenceDate: Date) => {
