@@ -53,7 +53,7 @@ export default function Dashboard() {
     if (selectedYearsForCharts.length === 0 && availableYears.length > 0) {
       setSelectedYearsForCharts(availableYears);
     }
-  }, [availableYears.length > 0]);
+  }, [availableYears]);
 
   // Calculate default date range from actual data
   const defaultDateRange = useMemo(() => {

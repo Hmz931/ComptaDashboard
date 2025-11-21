@@ -69,7 +69,7 @@ export default function ComparisonPage() {
 
   const displayAccounts = selectedAccounts.length > 0 
     ? selectedAccounts 
-    : comparisonData.allAccounts.slice(0, 5);
+    : comparisonData.allAccounts;
 
   return (
     <div className="min-h-screen bg-background p-6">
