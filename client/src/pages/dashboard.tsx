@@ -38,9 +38,10 @@ export default function Dashboard() {
   const incomeStatement = data?.incomeStatement || MOCK_INCOME_STATEMENT;
   
   const [selectedCategory, setSelectedCategory] = useState<string>("Tous les comptes");
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(["1020"]);
   const [selectedYearsForCharts, setSelectedYearsForCharts] = useState<number[]>([]);
   const [accountSearchTerm, setAccountSearchTerm] = useState<string>("");
+  const [detailsSearchTerm, setDetailsSearchTerm] = useState<string>("");
 
   // Extract available years from transactions
   const availableYears = useMemo(() => {
@@ -48,10 +49,10 @@ export default function Dashboard() {
     return Array.from(years).sort((a, b) => a - b);
   }, [transactions]);
 
-  // Initialize selected years on first load
+  // Initialize selected years on first load - default to last year only
   useEffect(() => {
     if (selectedYearsForCharts.length === 0 && availableYears.length > 0) {
-      setSelectedYearsForCharts(availableYears);
+      setSelectedYearsForCharts([availableYears[availableYears.length - 1]]);
     }
   }, [availableYears]);
 
@@ -717,6 +718,15 @@ export default function Dashboard() {
               <Card>
                 <CardHeader>
                     <CardTitle>Écritures détaillées</CardTitle>
+                    <div className="mt-3">
+                      <input
+                        type="text"
+                        placeholder="Rechercher par compte, date ou description..."
+                        className="w-full px-3 py-2 border border-input rounded-md text-sm"
+                        value={detailsSearchTerm}
+                        onChange={(e) => setDetailsSearchTerm(e.target.value.toLowerCase())}
+                      />
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -731,7 +741,13 @@ export default function Dashboard() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredData.slice(0, 500).map((txn) => (
+                            {filteredData.filter(txn => 
+                              !detailsSearchTerm || 
+                              txn.accountNumber.toLowerCase().includes(detailsSearchTerm) ||
+                              txn.accountName.toLowerCase().includes(detailsSearchTerm) ||
+                              txn.description.toLowerCase().includes(detailsSearchTerm) ||
+                              format(parseISO(txn.date), "dd.MM.yyyy").includes(detailsSearchTerm)
+                            ).slice(0, 500).map((txn) => (
                                 <TableRow key={txn.id}>
                                     <TableCell className="font-mono text-xs">{format(parseISO(txn.date), "dd.MM.yyyy")}</TableCell>
                                     <TableCell className="text-xs">
@@ -744,7 +760,13 @@ export default function Dashboard() {
                                     <TableCell className="text-right font-mono font-medium text-sm">{txn.cumulativeBalance?.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}</TableCell>
                                 </TableRow>
                             ))}
-                            {filteredData.length > 500 && (
+                            {filteredData.filter(txn => 
+                              !detailsSearchTerm || 
+                              txn.accountNumber.toLowerCase().includes(detailsSearchTerm) ||
+                              txn.accountName.toLowerCase().includes(detailsSearchTerm) ||
+                              txn.description.toLowerCase().includes(detailsSearchTerm) ||
+                              format(parseISO(txn.date), "dd.MM.yyyy").includes(detailsSearchTerm)
+                            ).length > 500 && (
                                 <TableRow>
                                     <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
                                         + {filteredData.length - 500} autres écritures... (Exportez pour voir tout)
