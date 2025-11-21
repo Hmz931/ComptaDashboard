@@ -49,7 +49,14 @@ export default function Dashboard() {
     return { from: dates[0], to: dates[dates.length - 1] };
   }, [transactions]);
   
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultDateRange);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  // Update dateRange when defaultDateRange changes (e.g., when new data is uploaded)
+  React.useEffect(() => {
+    if (!dateRange || dateRange.from === undefined || dateRange.to === undefined) {
+      setDateRange(defaultDateRange);
+    }
+  }, [defaultDateRange]);
 
   // Helper to parse date for sorting (must be defined before useMemo that uses it)
   const parse = (dateString: string, formatString: string, referenceDate: Date) => {
@@ -295,7 +302,7 @@ export default function Dashboard() {
               <p className="text-muted-foreground mt-1 text-sm">Suivi Évolution des Comptes • {filteredData.length} écritures</p>
             </div>
             <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setSelectedCategory("Tous les comptes"); setSelectedAccounts([]); setDateRange({ from: startOfYear(new Date()), to: endOfYear(new Date()) }); }} data-testid="button-reset-filters">
+                <Button variant="outline" size="sm" onClick={() => { setSelectedCategory("Tous les comptes"); setSelectedAccounts([]); setDateRange(defaultDateRange); }} data-testid="button-reset-filters">
                   <RotateCcw className="mr-2 h-4 w-4" /> Réinitialiser
                 </Button>
                 {!data && (
