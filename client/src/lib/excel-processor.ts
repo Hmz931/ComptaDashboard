@@ -312,22 +312,27 @@ export const processGLFile = async (file: File): Promise<{
     // Classify and Populate
     allAccounts.forEach(acc => {
         const firstDigit = acc.number[0];
-        const net = accountYearlyNet[acc.id];
+        let net = accountYearlyNet[acc.id];
         
         if (['1', '2'].includes(firstDigit)) {
              // Balance Sheet
-             // Assets (1) usually Debit +, Liabilities (2) Credit + (so Net is negative usually? depends on convention)
-             // In the python script: Net = Debit - Credit.
-             // Usually Assets are positive Net. Liabilities are Negative Net.
-             // But for display we often show absolute values or follow accounting sign.
-             // Let's keep Net as is (Debit - Credit).
+             // Assets (1): Debit = Positive (Debit - Credit)
+             // Liabilities (2): Credit = Positive (Credit - Debit) => Invert sign
+             if (firstDigit === '2') {
+                 net = -net; // Invert sign for Liabilities
+             }
              balanceSheetItems.push({
                  accountNumber: acc.number,
                  accountName: acc.name,
-                 amount: net // Cumulative for Balance Sheet? Python script uses yearly net sum. For BS it should be cumulative from start of time ideally, or just the imported period.
+                 amount: net
              });
         } else if (['3', '4', '5', '6', '7', '8'].includes(firstDigit)) {
             // Income Statement
+            // Revenues (3): Credit = Positive (Credit - Debit) => Invert sign
+            // Expenses (4-8): Debit = Positive (Debit - Credit)
+            if (firstDigit === '3') {
+                net = -net; // Invert sign for Revenues
+            }
             incomeStatementItems.push({
                 accountNumber: acc.number,
                 accountName: acc.name,
