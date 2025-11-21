@@ -125,7 +125,7 @@ export const CATEGORIE_LABELS: Record<string, string> = {
   "15": "Immobilisations meubles",
   "16": "Immobilisations immeubles",
   "17": "Immobilisations incorporelles",
-  "18": "Participations et prêts LT",
+  "18": "Capital non libéré",
   "20": "Dettes fournisseurs",
   "21": "Dettes financières CT",
   "22": "Dettes fiscales et sociales",

@@ -67,7 +67,7 @@ export default function ComparisonPage() {
       }
     });
 
-    // Transform to recharts format
+    // Transform to recharts format, filtering out categories with zero amounts across all years
     const chartData = years.map(year => ({
       year: year.toString(),
       ...Object.fromEntries(
@@ -78,7 +78,13 @@ export default function ComparisonPage() {
       )
     }));
 
-    return { chartData, years, accountsMap, allCategories: Object.keys(finalDataByCategory).sort() };
+    // Only show categories that have at least one non-zero value across all years
+    const allCategoriesFiltered = Object.entries(finalDataByCategory)
+      .filter(([_, data]) => Object.values(data).some(val => Math.abs(val) > 0))
+      .map(([category, _]) => category)
+      .sort();
+
+    return { chartData, years, accountsMap, allCategories: allCategoriesFiltered };
   }, [transactions, accounts]);
 
   // Colors for bars
