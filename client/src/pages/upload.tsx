@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, FileSpreadsheet, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Check } from "lucide-react";
 import { processGLFile } from "@/lib/excel-processor";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function UploadPage() {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const { setData } = useData();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -28,6 +29,7 @@ export default function UploadPage() {
     }
 
     setIsProcessing(true);
+    setUploadSuccess(false);
     try {
         const result = await processGLFile(file);
         setData({
@@ -38,6 +40,7 @@ export default function UploadPage() {
             processedFiles: result.rawProcessedData
         });
         
+        setUploadSuccess(true);
         toast({
             title: "Import réussi",
             description: `${result.transactions.length} écritures importées.`,
@@ -90,6 +93,7 @@ export default function UploadPage() {
                     className={`
                         h-64 flex flex-col items-center justify-center rounded-lg border-2 border-dashed transition-all cursor-pointer
                         ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/10 hover:border-primary/50 hover:bg-muted/50'}
+                        ${uploadSuccess ? 'border-green-500 bg-green-50/10' : ''}
                     `}
                 >
                     <input {...getInputProps()} />
@@ -98,6 +102,13 @@ export default function UploadPage() {
                         <div className="flex flex-col items-center gap-4 text-primary animate-in fade-in zoom-in">
                             <Loader2 className="h-12 w-12 animate-spin" />
                             <p className="font-medium">Analyse et nettoyage des données...</p>
+                        </div>
+                    ) : uploadSuccess ? (
+                        <div className="flex flex-col items-center gap-4 text-green-600 animate-in fade-in zoom-in">
+                            <div className="p-4 bg-green-100 dark:bg-green-900/20 rounded-full">
+                                <Check className="h-12 w-12" />
+                            </div>
+                            <p className="font-medium text-lg">Importation terminée !</p>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center gap-4 text-muted-foreground">

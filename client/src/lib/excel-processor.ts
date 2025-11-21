@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Account, Transaction, FinancialStatementItem } from './mockData';
-import { addDays, format, parse } from 'date-fns';
+import { parse } from 'date-fns';
 
 // Types for the processing logic
 interface RawSheetRow {
@@ -58,9 +58,11 @@ const parseSheetName = (sheetName: string): { number: string, name: string } | n
 const isTvaRow = (row: RawSheetRow, lastDate: string | null): boolean => {
     // Python: is_no_date = pd.isna(row['A']) or not re.match(r'\\d{2}\\.\\d{2}\\.\\d{4}', str(row['A']))
     const dateVal = row['A'] ? String(row['A']) : '';
+    // Check if empty or not a date
     const isNoDate = !dateVal || !/^\d{2}\.\d{2}\.\d{4}/.test(dateVal);
     
     // Python: has_amount = pd.notnull(row['G']) or pd.notnull(row['H']) or pd.notnull(row['I'])
+    // Check if any amount column has a value (not undefined/null/empty string)
     const hasAmount = (row['G'] !== undefined && row['G'] !== '') || 
                       (row['H'] !== undefined && row['H'] !== '') || 
                       (row['I'] !== undefined && row['I'] !== '');
@@ -81,7 +83,9 @@ const isChangeRow = (row: RawSheetRow): boolean => {
 const parseAmount = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0.0;
-    const str = String(val).replace(/'/g, '').replace(/,/g, '.'); // Handle Swiss formatting if strictly text
+    // Handle Swiss formatting: 1'234.56 or 1,234.56
+    // Replace apostrophes and handle commas
+    const str = String(val).replace(/'/g, '').replace(/,/g, '.'); 
     const num = parseFloat(str);
     return isNaN(num) ? 0.0 : num;
 };

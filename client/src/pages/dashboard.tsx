@@ -4,13 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, BALANCE_SHEET as MOCK_BALANCE_SHEET, INCOME_STATEMENT as MOCK_INCOME_STATEMENT, CATEGORIES } from "@/lib/mockData";
 import { format, parseISO, startOfYear, endOfYear } from "date-fns";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
@@ -221,6 +221,38 @@ export default function Dashboard() {
           variation: stats.end - stats.start
       })).sort((a, b) => Math.abs(b.variation) - Math.abs(a.variation));
   }, [filteredData]);
+
+  // Pie Chart Data (Charges per Category)
+  const pieChartData = useMemo(() => {
+      // Filter accounts starting with 4, 5, 6
+      const chargesCategories = {
+          "4": "Coûts directs",
+          "5": "Charges de personnel",
+          "6": "Autres charges"
+      };
+      
+      const data: Record<string, number> = {
+          "Coûts directs": 0,
+          "Charges de personnel": 0,
+          "Autres charges": 0
+      };
+
+      // We can use Income Statement items
+      incomeStatement.forEach(item => {
+          const firstDigit = item.accountNumber[0];
+          if (firstDigit === '4') data["Coûts directs"] += item.amount;
+          if (firstDigit === '5') data["Charges de personnel"] += item.amount;
+          if (firstDigit === '6') data["Autres charges"] += item.amount;
+      });
+
+      // Note: Expenses are typically Positive (Debit) in our IS calculation from excel-processor
+      return Object.entries(data).map(([name, value]) => ({
+          name,
+          value: Math.abs(value)
+      })).filter(i => i.value > 0);
+  }, [incomeStatement]);
+
+  const PIE_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
 
   const netResult = incomeStatement.reduce((acc, item) => acc + item.amount, 0);
   const isAggregatedView = selectedAccounts.length === 0 && selectedCategory !== "Tous les comptes";
@@ -475,18 +507,28 @@ export default function Dashboard() {
                       
                       <Card>
                           <CardHeader>
-                              <CardTitle>Ratios de Structure</CardTitle>
+                              <CardTitle>Répartition Charges</CardTitle>
                           </CardHeader>
-                          <CardContent className="space-y-4">
-                                {ratios.filter(r => r.category === "structure").slice(0, 3).map(ratio => (
-                                    <div key={ratio.name} className="flex justify-between items-center">
-                                        <span className="text-sm text-muted-foreground">{ratio.name}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-mono font-bold">{ratio.value.toFixed(1)}{ratio.unit}</span>
-                                            <RatioStatusIcon status={ratio.status} size={14} />
-                                        </div>
-                                    </div>
-                                ))}
+                          <CardContent className="h-[200px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={pieChartData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={40}
+                                            outerRadius={70}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            {pieChartData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
                           </CardContent>
                       </Card>
                   </div>
