@@ -502,6 +502,7 @@ export default function Dashboard() {
           <Tabs defaultValue="evolution" className="space-y-6">
             <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent gap-6">
               <TabsTrigger value="evolution" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Évolution</TabsTrigger>
+              <TabsTrigger value="comparison" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Comparaison</TabsTrigger>
               <TabsTrigger value="details" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Détails</TabsTrigger>
               <TabsTrigger value="resume" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Résumé</TabsTrigger>
             </TabsList>
@@ -749,7 +750,27 @@ export default function Dashboard() {
               </div>
             </TabsContent>
 
-            {/* Tab 2: Details */}
+            {/* Tab 2: Comparison */}
+            <TabsContent value="comparison" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Comparaison Annuelle</CardTitle>
+                      <CardDescription>Analyse comparative des catégories par année</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setLocation("/comparison")}>
+                      Accéder à la page complète →
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="text-center text-muted-foreground py-8">
+                  <p>Cliquez sur le bouton ci-dessus pour accéder à la page de comparaison détaillée avec sélection de catégories.</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab 3: Details */}
             <TabsContent value="details">
               <Card>
                 <CardHeader>
@@ -815,7 +836,7 @@ export default function Dashboard() {
               </Card>
             </TabsContent>
 
-            {/* Tab 3: Resume */}
+            {/* Tab 4: Resume */}
             <TabsContent value="resume" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <Card className="lg:col-span-2">
