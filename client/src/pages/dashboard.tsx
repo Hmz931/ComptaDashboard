@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet } from "lucide-react";
+import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
@@ -21,13 +21,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { calculateRatios, Ratio } from "@/lib/ratios";
+import { toPng } from 'html-to-image';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 export default function Dashboard() {
   const { data } = useData();
   const [, setLocation] = useLocation();
+  const chartRef = useRef<HTMLDivElement>(null);
 
   // Fallback to mock data if no context data (e.g. direct access)
-  // In a real app, we might redirect to upload.
   const accounts = data?.accounts || MOCK_ACCOUNTS;
   const transactions = data?.transactions || MOCK_TRANSACTIONS;
   const balanceSheet = data?.balanceSheet || MOCK_BALANCE_SHEET;
@@ -40,6 +44,9 @@ export default function Dashboard() {
     to: endOfYear(new Date()),
   });
 
+  const ratios = useMemo(() => calculateRatios(accounts, transactions, balanceSheet, incomeStatement), [accounts, transactions, balanceSheet, incomeStatement]);
+
+  // Export Handlers
   const handleDownloadCleanGL = () => {
       if (!data?.processedFiles?.cleanGL) return;
       const ws = XLSX.utils.json_to_sheet(data.processedFiles.cleanGL);
@@ -50,17 +57,11 @@ export default function Dashboard() {
 
   const handleDownloadFinancialStatements = () => {
       if (!data?.processedFiles?.financialStatements) return;
-      
       const wb = XLSX.utils.book_new();
-      
-      // Balance Sheet
       const wsBS = XLSX.utils.json_to_sheet(data.processedFiles.financialStatements.balanceSheet);
       XLSX.utils.book_append_sheet(wb, wsBS, "Balance Sheet");
-      
-      // Income Statement
       const wsIS = XLSX.utils.json_to_sheet(data.processedFiles.financialStatements.incomeStatement);
       XLSX.utils.book_append_sheet(wb, wsIS, "Income Statement");
-      
       XLSX.writeFile(wb, "Financial_Statements.xlsx");
   };
   
@@ -72,17 +73,31 @@ export default function Dashboard() {
        XLSX.writeFile(wb, "Plan_Comptable.xlsx");
   };
 
+  const handleDownloadChart = async () => {
+    if (chartRef.current) {
+      try {
+        const dataUrl = await toPng(chartRef.current, { cacheBust: true, backgroundColor: '#ffffff' });
+        const link = document.createElement('a');
+        link.download = 'evolution-solde.png';
+        link.href = dataUrl;
+        link.click();
+      } catch (err) {
+        console.error('Could not generate image', err);
+      }
+    }
+  };
 
   // Filter Logic
   const filteredData = useMemo(() => {
     const pattern = new RegExp(CATEGORIES[selectedCategory as keyof typeof CATEGORIES]);
     
-    // 1. Filter Accounts based on Category and Selection
+    // 1. Filter Accounts
     const relevantAccounts = accounts.filter(acc => {
+        // If specific accounts selected, ONLY use those
         if (selectedAccounts.length > 0) {
             return selectedAccounts.includes(acc.id);
         }
-        // Use category if available, else try to match number regex
+        // Otherwise use category
         if (acc.category && CATEGORIES[selectedCategory as keyof typeof CATEGORIES] !== ".*") {
              return acc.category === selectedCategory || pattern.test(acc.number);
         }
@@ -102,7 +117,6 @@ export default function Dashboard() {
     }
 
     // 3. Calculate Cumulative Balance
-    // We need to sort by date first
     txns.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Group by account to calculate cumulative balance per account
@@ -127,16 +141,66 @@ export default function Dashboard() {
     return txnsWithBalance;
   }, [selectedCategory, selectedAccounts, dateRange, accounts, transactions]);
 
-  // Chart Data Preparation
+  // Chart Data Preparation (Sum vs Individual)
   const chartData = useMemo(() => {
-    return filteredData.map(t => ({
-        date: format(parseISO(t.date), "dd.MM.yyyy"),
-        timestamp: new Date(t.date).getTime(),
-        balance: t.cumulativeBalance,
-        account: `${t.accountNumber} - ${t.accountName}`,
-        [t.accountNumber!]: t.cumulativeBalance
-    }));
-  }, [filteredData]);
+    // If Specific Accounts are selected -> Show Individual Lines (Detail View)
+    // If Category is selected (and no specific accounts) -> Show Aggregated Sum (Macro View)
+    const isAggregated = selectedAccounts.length === 0 && selectedCategory !== "Tous les comptes";
+    
+    if (isAggregated) {
+        // Aggregate by Date
+        const dateMap: Record<string, { date: string, timestamp: number, balance: number }> = {};
+        let runningBalance = 0;
+        
+        // We need to process all transactions in order to get a correct running sum for the category
+        // filteredData is already sorted by date
+        
+        // Group by date first
+        const dailyMovements: Record<string, number> = {};
+        filteredData.forEach(t => {
+            const d = format(parseISO(t.date), "dd.MM.yyyy");
+            dailyMovements[d] = (dailyMovements[d] || 0) + t.movement;
+        });
+
+        // Create cumulative trend
+        // Note: This is simplified. Ideally we need all dates in range.
+        const dates = Object.keys(dailyMovements).sort((a, b) => {
+             return parse(a, "dd.MM.yyyy", new Date()).getTime() - parse(b, "dd.MM.yyyy", new Date()).getTime();
+        });
+        
+        const result = [];
+        let cumulative = 0;
+        
+        // Add initial point?
+        
+        for (const d of dates) {
+            cumulative += dailyMovements[d];
+            result.push({
+                date: d,
+                timestamp: parse(d, "dd.MM.yyyy", new Date()).getTime(),
+                "Total Categorie": cumulative,
+                account: "Total Categorie"
+            });
+        }
+        return result;
+    } else {
+        // Individual Lines
+        return filteredData.map(t => ({
+            date: format(parseISO(t.date), "dd.MM.yyyy"),
+            timestamp: new Date(t.date).getTime(),
+            balance: t.cumulativeBalance,
+            account: `${t.accountNumber} - ${t.accountName}`,
+            [t.accountNumber!]: t.cumulativeBalance
+        }));
+    }
+  }, [filteredData, selectedAccounts, selectedCategory]);
+  
+  // Helper to parse date for sorting (since date-fns parse needs format)
+  const parse = (dateString: string, formatString: string, referenceDate: Date) => {
+      // Simple implementation or use date-fns parse
+      const parts = dateString.split('.');
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+  };
 
   // Calculate Summary Stats
   const summaryStats = useMemo(() => {
@@ -159,175 +223,274 @@ export default function Dashboard() {
   }, [filteredData]);
 
   const netResult = incomeStatement.reduce((acc, item) => acc + item.amount, 0);
+  const isAggregatedView = selectedAccounts.length === 0 && selectedCategory !== "Tous les comptes";
 
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground p-6 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                <TrendingUp className="h-8 w-8" />
+    <div className="h-screen flex flex-col bg-background font-sans text-foreground overflow-hidden">
+      {/* Header - Fixed */}
+      <div className="flex-none p-6 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <TrendingUp className="h-8 w-8" />
+                </div>
+                Mecahome Sarl
+              </h1>
+              <p className="text-muted-foreground mt-1 text-sm">Suivi Évolution des Comptes • {filteredData.length} écritures</p>
             </div>
-            Mecahome Sarl
-          </h1>
-          <p className="text-muted-foreground mt-2 text-lg">Suivi Évolution des Comptes</p>
-        </div>
-        <div className="flex items-center gap-2">
-            {!data && (
-                 <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
-                    <UploadPageIcon className="mr-2 h-4 w-4" /> Nouvel Import
-                 </Button>
-            )}
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="default" size="sm">
-                    <Download className="mr-2 h-4 w-4" /> Exporter Rapports
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleDownloadCleanGL} disabled={!data}>
-                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Comptes_Cleans.xlsx
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDownloadFinancialStatements} disabled={!data}>
-                    <FileText className="mr-2 h-4 w-4" /> Financial_Statements.xlsx
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDownloadPlanComptable} disabled={!data}>
-                    <FileText className="mr-2 h-4 w-4" /> Plan_Comptable.xlsx
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
+            <div className="flex items-center gap-2">
+                {!data && (
+                     <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
+                        <UploadPageIcon className="mr-2 h-4 w-4" /> Nouvel Import
+                     </Button>
+                )}
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="default" size="sm">
+                        <Download className="mr-2 h-4 w-4" /> Exporter
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleDownloadCleanGL} disabled={!data}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" /> Comptes_Cleans.xlsx
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDownloadFinancialStatements} disabled={!data}>
+                        <FileText className="mr-2 h-4 w-4" /> Financial_Statements.xlsx
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDownloadPlanComptable} disabled={!data}>
+                        <FileText className="mr-2 h-4 w-4" /> Plan_Comptable.xlsx
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDownloadChart} disabled={filteredData.length === 0}>
+                        <Camera className="mr-2 h-4 w-4" /> Graphique (PNG)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+          </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Sidebar / Filters */}
-        <Card className="h-fit lg:col-span-1 border-sidebar-border bg-sidebar/30 backdrop-blur-sm shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Filter className="h-4 w-4" /> Filtres</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Catégorie</label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(CATEGORIES).map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* Sidebar - Scrollable independently if needed, or fixed */}
+        <div className="w-80 flex-none border-r border-border bg-sidebar/30 backdrop-blur-sm overflow-y-auto p-6 space-y-6">
+            <div className="space-y-1">
+                <h3 className="font-semibold flex items-center gap-2"><Filter className="h-4 w-4" /> Filtres</h3>
+                <p className="text-xs text-muted-foreground">Affinez votre vue</p>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Catégorie</label>
+                <Select value={selectedCategory} onValueChange={(val) => { setSelectedCategory(val); setSelectedAccounts([]); }}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(CATEGORIES).map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-sm font-medium">Comptes Spécifiques</label>
+                 <div className="max-h-[200px] overflow-y-auto border rounded-md p-2 space-y-1 bg-background">
+                    {accounts
+                        .filter(a => {
+                             const pattern = new RegExp(CATEGORIES[selectedCategory as keyof typeof CATEGORIES]);
+                             return pattern.test(a.number);
+                        })
+                        .map(acc => (
+                        <div key={acc.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                                id={`acc-${acc.id}`} 
+                                checked={selectedAccounts.includes(acc.id)}
+                                onCheckedChange={(checked) => {
+                                    if (checked) {
+                                        setSelectedAccounts([...selectedAccounts, acc.id]);
+                                    } else {
+                                        setSelectedAccounts(selectedAccounts.filter(id => id !== acc.id));
+                                    }
+                                }}
+                            />
+                            <label
+                                htmlFor={`acc-${acc.id}`}
+                                className="text-xs leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate cursor-pointer"
+                                title={acc.name}
+                            >
+                                <span className="font-mono font-bold">{acc.number}</span> {acc.name}
+                            </label>
+                        </div>
+                    ))}
+                 </div>
+                 <p className="text-[10px] text-muted-foreground">Sélectionnez pour voir le détail individuel.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Période</label>
+                <CalendarDateRangePicker date={dateRange} setDate={setDateRange} />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Période</label>
-              <CalendarDateRangePicker date={dateRange} setDate={setDateRange} />
+            <div className="pt-4 border-t border-border space-y-4">
+                <div className="space-y-1">
+                    <h3 className="font-semibold flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Ratios Clés</h3>
+                </div>
+                <div className="space-y-3">
+                    {ratios.slice(0, 4).map((ratio) => (
+                        <div key={ratio.name} className="p-3 bg-card rounded-lg border shadow-sm">
+                            <div className="flex justify-between items-start mb-1">
+                                <span className="text-xs font-medium text-muted-foreground">{ratio.name}</span>
+                                <RatioStatusIcon status={ratio.status} />
+                            </div>
+                            <div className="text-xl font-bold tabular-nums">
+                                {ratio.value.toFixed(ratio.unit === "%" ? 1 : 2)}
+                                <span className="text-xs font-normal text-muted-foreground ml-1">{ratio.unit}</span>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-1">{ratio.interpretation}</div>
+                        </div>
+                    ))}
+                </div>
             </div>
+        </div>
 
-            <div className="p-4 bg-muted/50 rounded-md text-sm text-muted-foreground">
-                <p>Comptes: {summaryStats.length}</p>
-                <p>Écritures: {filteredData.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Main Content */}
-        <div className="lg:col-span-3">
+        {/* Tabs Content Area */}
+        <div className="flex-1 overflow-y-auto p-6">
           <Tabs defaultValue="evolution" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-              <TabsTrigger value="evolution">Évolution</TabsTrigger>
-              <TabsTrigger value="details">Détails</TabsTrigger>
-              <TabsTrigger value="resume">Résumé</TabsTrigger>
+            <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent gap-6">
+              <TabsTrigger value="evolution" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Évolution</TabsTrigger>
+              <TabsTrigger value="details" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Détails</TabsTrigger>
+              <TabsTrigger value="resume" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Résumé</TabsTrigger>
             </TabsList>
 
             {/* Tab 1: Evolution */}
             <TabsContent value="evolution" className="space-y-6">
-              <Card>
-                <CardHeader>
-                    <CardTitle>Évolution du solde cumulé</CardTitle>
-                    <CardDescription>Visualisation graphique des mouvements par compte</CardDescription>
-                </CardHeader>
-                <CardContent className="h-[400px]">
-                  {filteredData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis 
-                                dataKey="date" 
-                                stroke="hsl(var(--muted-foreground))" 
-                                fontSize={12} 
-                                tickLine={false} 
-                                axisLine={false}
-                                minTickGap={30}
-                            />
-                            <YAxis 
-                                stroke="hsl(var(--muted-foreground))" 
-                                fontSize={12} 
-                                tickLine={false} 
-                                axisLine={false}
-                                tickFormatter={(value) => `${value}`}
-                            />
-                            <Tooltip 
-                                contentStyle={{ backgroundColor: "hsl(var(--popover))", borderColor: "hsl(var(--border))", borderRadius: "var(--radius)" }}
-                                itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                            />
-                            <Legend />
-                            {summaryStats.slice(0, 5).map((stat, index) => (
-                                <Line 
-                                    key={stat.account} 
-                                    type="monotone" 
-                                    dataKey={stat.account.split(" - ")[0]} 
-                                    stroke={`hsl(var(--chart-${(index % 5) + 1}))`} 
-                                    strokeWidth={2}
-                                    dot={false}
-                                    name={stat.account}
-                                    connectNulls
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <Card className="lg:col-span-2" ref={chartRef}>
+                    <CardHeader>
+                        <CardTitle>Évolution {isAggregatedView ? "Globale (Somme)" : "Détaillée"}</CardTitle>
+                        <CardDescription>
+                            {isAggregatedView 
+                                ? `Cumul de tous les comptes de la catégorie ${selectedCategory}` 
+                                : "Visualisation individuelle des comptes sélectionnés"}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[450px]">
+                      {filteredData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                                <XAxis 
+                                    dataKey="date" 
+                                    stroke="hsl(var(--muted-foreground))" 
+                                    fontSize={12} 
+                                    tickLine={false} 
+                                    axisLine={false}
+                                    minTickGap={40}
+                                    dy={10}
                                 />
-                            ))}
-                        </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-muted-foreground">
-                        Aucune donnée pour ces critères
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                                <YAxis 
+                                    stroke="hsl(var(--muted-foreground))" 
+                                    fontSize={12} 
+                                    tickLine={false} 
+                                    axisLine={false}
+                                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                                    dx={-10}
+                                />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: "hsl(var(--popover))", borderColor: "hsl(var(--border))", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)" }}
+                                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                                    formatter={(value: number) => [value.toLocaleString('fr-CH', { minimumFractionDigits: 2 }), isAggregatedView ? "Total" : "Solde"]}
+                                    labelStyle={{ color: "hsl(var(--muted-foreground))", marginBottom: "0.5rem" }}
+                                />
+                                <Legend wrapperStyle={{ paddingTop: "20px" }} />
+                                {isAggregatedView ? (
+                                    <Line 
+                                        type="monotone" 
+                                        dataKey="Total Categorie" 
+                                        stroke="hsl(var(--primary))" 
+                                        strokeWidth={3}
+                                        dot={false}
+                                        activeDot={{ r: 6, strokeWidth: 0 }}
+                                    />
+                                ) : (
+                                    summaryStats.slice(0, 10).map((stat, index) => (
+                                        <Line 
+                                            key={stat.account} 
+                                            type="monotone" 
+                                            dataKey={stat.account.split(" - ")[0]} 
+                                            stroke={`hsl(var(--chart-${(index % 5) + 1}))`} 
+                                            strokeWidth={2}
+                                            dot={false}
+                                            name={stat.account}
+                                            connectNulls
+                                        />
+                                    ))
+                                )}
+                            </LineChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                            Aucune donnée pour ces critères
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader>
-                    <CardTitle>Variation des soldes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Compte</TableHead>
-                                <TableHead className="text-right">Solde début</TableHead>
-                                <TableHead className="text-right">Solde fin</TableHead>
-                                <TableHead className="text-right">Variation</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {summaryStats.map((stat) => (
-                                <TableRow key={stat.account}>
-                                    <TableCell className="font-medium">{stat.account}</TableCell>
-                                    <TableCell className="text-right font-mono">{stat.start.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-mono">{stat.end.toFixed(2)}</TableCell>
-                                    <TableCell className={cn("text-right font-mono font-bold", stat.variation >= 0 ? "text-emerald-600" : "text-red-600")}>
-                                        {stat.variation > 0 ? "+" : ""}{stat.variation.toFixed(2)}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-              </Card>
+                  <div className="space-y-6">
+                      <Card>
+                        <CardHeader>
+                            <CardTitle>Top Variations</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Compte</TableHead>
+                                        <TableHead className="text-right">Var.</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {summaryStats.slice(0, 5).map((stat) => (
+                                        <TableRow key={stat.account}>
+                                            <TableCell className="font-medium text-xs">
+                                                <div className="font-mono">{stat.account.split(' - ')[0]}</div>
+                                                <div className="truncate w-24 text-muted-foreground" title={stat.account.split(' - ')[1]}>{stat.account.split(' - ')[1]}</div>
+                                            </TableCell>
+                                            <TableCell className={cn("text-right font-mono font-bold text-xs", stat.variation >= 0 ? "text-emerald-600" : "text-red-600")}>
+                                                {stat.variation > 0 ? "+" : ""}{stat.variation.toLocaleString('fr-CH', { maximumFractionDigits: 0 })}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                          <CardHeader>
+                              <CardTitle>Ratios de Structure</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                                {ratios.filter(r => r.category === "structure").slice(0, 3).map(ratio => (
+                                    <div key={ratio.name} className="flex justify-between items-center">
+                                        <span className="text-sm text-muted-foreground">{ratio.name}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono font-bold">{ratio.value.toFixed(1)}{ratio.unit}</span>
+                                            <RatioStatusIcon status={ratio.status} size={14} />
+                                        </div>
+                                    </div>
+                                ))}
+                          </CardContent>
+                      </Card>
+                  </div>
+              </div>
             </TabsContent>
 
             {/* Tab 2: Details */}
@@ -349,16 +512,26 @@ export default function Dashboard() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredData.map((txn) => (
+                            {filteredData.slice(0, 500).map((txn) => (
                                 <TableRow key={txn.id}>
                                     <TableCell className="font-mono text-xs">{format(parseISO(txn.date), "dd.MM.yyyy")}</TableCell>
-                                    <TableCell className="text-xs">{txn.accountNumber} - {txn.accountName}</TableCell>
-                                    <TableCell className="max-w-[200px] truncate" title={txn.description}>{txn.description}</TableCell>
-                                    <TableCell className="text-right font-mono text-muted-foreground">{txn.debit > 0 ? txn.debit.toFixed(2) : "-"}</TableCell>
-                                    <TableCell className="text-right font-mono text-muted-foreground">{txn.credit > 0 ? txn.credit.toFixed(2) : "-"}</TableCell>
-                                    <TableCell className="text-right font-mono font-medium">{txn.cumulativeBalance?.toFixed(2)}</TableCell>
+                                    <TableCell className="text-xs">
+                                        <span className="font-mono font-bold mr-1">{txn.accountNumber}</span> 
+                                        <span className="text-muted-foreground">{txn.accountName}</span>
+                                    </TableCell>
+                                    <TableCell className="max-w-[300px] truncate text-sm" title={txn.description}>{txn.description}</TableCell>
+                                    <TableCell className="text-right font-mono text-muted-foreground text-sm">{txn.debit > 0 ? txn.debit.toLocaleString('fr-CH', { minimumFractionDigits: 2 }) : ""}</TableCell>
+                                    <TableCell className="text-right font-mono text-muted-foreground text-sm">{txn.credit > 0 ? txn.credit.toLocaleString('fr-CH', { minimumFractionDigits: 2 }) : ""}</TableCell>
+                                    <TableCell className="text-right font-mono font-medium text-sm">{txn.cumulativeBalance?.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}</TableCell>
                                 </TableRow>
                             ))}
+                            {filteredData.length > 500 && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
+                                        + {filteredData.length - 500} autres écritures... (Exportez pour voir tout)
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
@@ -383,7 +556,10 @@ export default function Dashboard() {
                                 <TableBody>
                                     {balanceSheet.map((item) => (
                                         <TableRow key={item.accountNumber}>
-                                            <TableCell>{item.accountNumber} - {item.accountName}</TableCell>
+                                            <TableCell>
+                                                <span className="font-mono font-bold mr-2">{item.accountNumber}</span>
+                                                {item.accountName}
+                                            </TableCell>
                                             <TableCell className="text-right font-mono">{item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}</TableCell>
                                         </TableRow>
                                     ))}
@@ -392,38 +568,64 @@ export default function Dashboard() {
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Compte de Résultat</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Compte</TableHead>
-                                        <TableHead className="text-right">Montant</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {incomeStatement.map((item) => (
-                                        <TableRow key={item.accountNumber}>
-                                            <TableCell>{item.accountNumber} - {item.accountName}</TableCell>
-                                            <TableCell className={cn("text-right font-mono", item.amount < 0 ? "text-red-500" : "")}>
-                                                {item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}
-                                            </TableCell>
+                    <div className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Compte de Résultat</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Compte</TableHead>
+                                            <TableHead className="text-right">Montant</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                            
-                            <div className="flex justify-between items-center p-4 bg-muted rounded-lg border border-border">
-                                <span className="font-bold text-lg">Résultat Net</span>
-                                <Badge variant={netResult >= 0 ? "default" : "destructive"} className="text-lg px-3 py-1">
-                                    {netResult.toLocaleString('fr-CH', { style: 'currency', currency: 'CHF' })}
-                                </Badge>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {incomeStatement.map((item) => (
+                                            <TableRow key={item.accountNumber}>
+                                                <TableCell>
+                                                    <span className="font-mono font-bold mr-2">{item.accountNumber}</span>
+                                                    {item.accountName}
+                                                </TableCell>
+                                                <TableCell className={cn("text-right font-mono", item.amount < 0 ? "text-red-500" : "")}>
+                                                    {item.amount.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                
+                                <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg border border-border">
+                                    <span className="font-bold text-lg">Résultat Net</span>
+                                    <Badge variant={netResult >= 0 ? "default" : "destructive"} className="text-lg px-3 py-1">
+                                        {Math.abs(netResult).toLocaleString('fr-CH', { style: 'currency', currency: 'CHF' })}
+                                        {netResult < 0 ? " (Bénéfice)" : " (Perte)"}
+                                    </Badge>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                             <CardHeader>
+                                <CardTitle>Analyse de Rentabilité</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {ratios.filter(r => r.category === "profitability").map(ratio => (
+                                    <div key={ratio.name} className="flex justify-between items-center border-b last:border-0 pb-2 last:pb-0">
+                                        <div>
+                                            <div className="font-medium text-sm">{ratio.name}</div>
+                                            <div className="text-[10px] text-muted-foreground">{ratio.interpretation}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono font-bold text-lg">{ratio.value.toFixed(1)}{ratio.unit}</span>
+                                            <RatioStatusIcon status={ratio.status} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
             </TabsContent>
           </Tabs>
@@ -452,4 +654,11 @@ function UploadPageIcon(props: any) {
             <line x1="12" x2="12" y1="3" y2="15" />
         </svg>
     )
+}
+
+function RatioStatusIcon({ status, size = 16 }: { status?: "good" | "warning" | "bad" | "neutral", size?: number }) {
+    if (status === "good") return <ArrowUpRight size={size} className="text-emerald-500" />;
+    if (status === "bad") return <ArrowDownRight size={size} className="text-red-500" />;
+    if (status === "warning") return <Minus size={size} className="text-amber-500" />;
+    return <Minus size={size} className="text-muted-foreground" />;
 }
