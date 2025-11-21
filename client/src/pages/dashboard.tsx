@@ -306,6 +306,9 @@ export default function Dashboard() {
                 <Button variant="link" size="sm" onClick={() => setLocation("/ratios")}>
                   <FileText className="mr-2 h-4 w-4" /> Ratios
                 </Button>
+                <Button variant="link" size="sm" onClick={() => setLocation("/plan-comptable")}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Plan
+                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="default" size="sm">
@@ -671,9 +674,10 @@ export default function Dashboard() {
                             <div className="space-y-6">
                                 <div>
                                     <h4 className="font-semibold text-sm mb-3 text-emerald-700 dark:text-emerald-400">Actifs (1xxx)</h4>
+                                    <div className="max-h-[400px] overflow-y-auto">
                                     <Table className="text-sm">
                                         <TableBody>
-                                            {balanceSheet.filter(i => i.accountNumber.startsWith('1')).slice(0, 10).map((item) => (
+                                            {balanceSheet.filter(i => i.accountNumber.startsWith('1')).map((item) => (
                                                 <TableRow key={item.accountNumber}>
                                                     <TableCell className="text-xs"><span className="font-mono font-bold">{item.accountNumber}</span></TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">{item.accountName}</TableCell>
@@ -682,12 +686,14 @@ export default function Dashboard() {
                                             ))}
                                         </TableBody>
                                     </Table>
+                                    </div>
                                 </div>
                                 <div className="border-t pt-4">
                                     <h4 className="font-semibold text-sm mb-3 text-red-700 dark:text-red-400">Passifs & Fonds Propres (2xxx)</h4>
+                                    <div className="max-h-[400px] overflow-y-auto">
                                     <Table className="text-sm">
                                         <TableBody>
-                                            {balanceSheet.filter(i => i.accountNumber.startsWith('2')).slice(0, 10).map((item) => (
+                                            {balanceSheet.filter(i => i.accountNumber.startsWith('2')).map((item) => (
                                                 <TableRow key={item.accountNumber}>
                                                     <TableCell className="text-xs"><span className="font-mono font-bold">{item.accountNumber}</span></TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">{item.accountName}</TableCell>
@@ -696,6 +702,7 @@ export default function Dashboard() {
                                             ))}
                                         </TableBody>
                                     </Table>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
