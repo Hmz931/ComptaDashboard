@@ -760,19 +760,15 @@ export default function Dashboard() {
 
             {/* Tab 2: Comparison */}
             <TabsContent value="comparison" className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Comparaison Annuelle</h3>
+                  <p className="text-sm text-muted-foreground">Analyse comparative des catégories par année</p>
+                </div>
+              </div>
+
               <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Comparaison Annuelle</CardTitle>
-                      <CardDescription>Analyse comparative des catégories par année</CardDescription>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setLocation("/comparison")}>
-                      Accéder à la page complète →
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="h-[450px]">
+                <CardContent className="h-[450px] pt-6">
                   {comparisonData.chartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={comparisonData.chartData}>
