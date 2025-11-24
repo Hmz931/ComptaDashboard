@@ -4,18 +4,14 @@ import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
-import { parseISO, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
+import { parseISO, startOfYear, endOfYear } from "date-fns";
 import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS } from "@/lib/mockData";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-type PeriodType = "monthly" | "quarterly" | "semi-annual" | "annual";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 interface CategoryData {
   name: string;
   prefix: string[];
   label: string;
-  color: string;
 }
 
 export default function PieChartsPage() {
@@ -25,42 +21,23 @@ export default function PieChartsPage() {
   const accounts = data?.accounts || MOCK_ACCOUNTS;
   const transactions = data?.transactions || MOCK_TRANSACTIONS;
 
-  const [periodType, setPeriodType] = useState<PeriodType>("annual");
-
   // Define the 4 main categories
   const categories: CategoryData[] = [
-    { name: "Actifs", prefix: ["1"], label: "Comptes 1XXXXX", color: "hsl(var(--chart-1))" },
-    { name: "Passifs", prefix: ["2"], label: "Comptes 2XXXX", color: "hsl(var(--chart-2))" },
-    { name: "Produits", prefix: ["3"], label: "Comptes 3XXXX", color: "hsl(var(--chart-3))" },
-    { name: "Charges", prefix: ["4", "5", "6", "7", "8"], label: "Comptes 4XXXX-8999X", color: "hsl(var(--chart-4))" }
+    { name: "Actifs", prefix: ["1"], label: "Comptes 1XXXXX" },
+    { name: "Passifs", prefix: ["2"], label: "Comptes 2XXXX" },
+    { name: "Produits", prefix: ["3"], label: "Comptes 3XXXX" },
+    { name: "Charges", prefix: ["4", "5", "6", "7", "8"], label: "Comptes 4XXXX-8999X" }
   ];
 
-  // Get date range based on period type
-  const getDateRange = (date: Date, type: PeriodType) => {
-    switch (type) {
-      case "monthly":
-        return { start: startOfMonth(date), end: endOfMonth(date) };
-      case "quarterly":
-        return { start: startOfQuarter(date), end: endOfQuarter(date) };
-      case "semi-annual":
-        const month = date.getMonth();
-        const year = date.getFullYear();
-        if (month < 6) {
-          return { start: new Date(year, 0, 1), end: new Date(year, 5, 30) };
-        } else {
-          return { start: new Date(year, 6, 1), end: new Date(year, 11, 31) };
-        }
-      case "annual":
-        return { start: startOfYear(date), end: endOfYear(date) };
-    }
-  };
-
-  // Calculate pie chart data for each category
+  // Calculate pie chart data for each category (annual only)
   const chartDataByCategory = useMemo(() => {
     const now = new Date();
-    const dateRange = getDateRange(now, periodType);
+    const dateRange = { 
+      start: startOfYear(now), 
+      end: endOfYear(now) 
+    };
 
-    const result: Record<string, Array<{ name: string; value: number }>> = {};
+    const result: Record<string, Array<{ name: string; value: number; account: string }>> = {};
 
     categories.forEach((category) => {
       // Get all accounts for this category
@@ -79,7 +56,7 @@ export default function PieChartsPage() {
       });
 
       // Group by account and sum debits/credits
-      const accountData: Record<string, { name: string; debit: number; credit: number }> = {};
+      const accountData: Record<string, { name: string; account: string; debit: number; credit: number }> = {};
 
       categoryTransactions.forEach(txn => {
         const account = accountsMap.get(txn.accountId);
@@ -87,7 +64,12 @@ export default function PieChartsPage() {
 
         const key = account.id;
         if (!accountData[key]) {
-          accountData[key] = { name: `${account.number} - ${account.name}`, debit: 0, credit: 0 };
+          accountData[key] = { 
+            name: account.name, 
+            account: `${account.number} - ${account.name}`,
+            debit: 0, 
+            credit: 0 
+          };
         }
         accountData[key].debit += txn.debit;
         accountData[key].credit += txn.credit;
@@ -97,17 +79,17 @@ export default function PieChartsPage() {
       const pieData = Object.values(accountData)
         .map(item => ({
           name: item.name,
+          account: item.account,
           value: Math.abs(item.debit - item.credit)
         }))
         .filter(item => item.value > 0)
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 10); // Limit to top 10 accounts
+        .sort((a, b) => b.value - a.value);
 
-      result[category.name] = pieData.length > 0 ? pieData : [{ name: "Aucune donnée", value: 0 }];
+      result[category.name] = pieData.length > 0 ? pieData : [];
     });
 
     return result;
-  }, [transactions, accounts, periodType, categories]);
+  }, [transactions, accounts, categories]);
 
   // Colors for pie charts
   const PIE_COLORS = [
@@ -128,32 +110,15 @@ export default function PieChartsPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold">Visualisation par Graphiques Circulaires</h1>
-            <p className="text-muted-foreground">Analyse par catégories comptables</p>
+            <p className="text-muted-foreground">Analyse par catégories comptables - Année en cours</p>
           </div>
         </div>
 
-        {/* Period Selection Tabs */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Sélection de Période</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={periodType} onValueChange={(value) => setPeriodType(value as PeriodType)}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="monthly" data-testid="tab-monthly">Mensuel</TabsTrigger>
-                <TabsTrigger value="quarterly" data-testid="tab-quarterly">Trimestriel</TabsTrigger>
-                <TabsTrigger value="semi-annual" data-testid="tab-semi-annual">Semestriel</TabsTrigger>
-                <TabsTrigger value="annual" data-testid="tab-annual">Annuel</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardContent>
-        </Card>
-
         {/* 4 Pie Charts Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {categories.map((category) => {
             const pieData = chartDataByCategory[category.name] || [];
-            const hasData = pieData.some(d => d.value > 0);
+            const hasData = pieData.length > 0;
             const total = pieData.reduce((sum, item) => sum + item.value, 0);
 
             return (
@@ -163,42 +128,66 @@ export default function PieChartsPage() {
                   <CardDescription>{category.label}</CardDescription>
                   {hasData && (
                     <div className="mt-2 text-sm font-semibold">
-                      Total: {total.toLocaleString('fr-CH', { minimumFractionDigits: 0 })}
+                      Total: {total.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}
                     </div>
                   )}
                 </CardHeader>
-                <CardContent className="flex-1 flex items-center justify-center">
+                <CardContent className="flex-1 flex gap-4">
                   {hasData ? (
-                    <ResponsiveContainer width="100%" height={400}>
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={(entry) => `${entry.name.split(' - ')[0]}: ${(entry.value / 1000).toFixed(1)}k`}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} 
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '0.5rem'
-                          }}
-                        />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <>
+                      {/* Pie Chart */}
+                      <div className="flex-1 flex items-center justify-center min-h-[350px]">
+                        <ResponsiveContainer width="100%" height={350}>
+                          <PieChart>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={2}
+                              dataKey="value"
+                            >
+                              {pieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} 
+                              contentStyle={{
+                                backgroundColor: 'hsl(var(--background))',
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '0.5rem',
+                                fontSize: '12px'
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Legend List */}
+                      <div className="w-56 flex flex-col gap-2 overflow-y-auto pr-2">
+                        {pieData.map((item, index) => (
+                          <div key={item.account} className="text-xs p-2 rounded-md bg-muted/50 border border-border">
+                            <div className="flex items-start gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
+                                style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-foreground truncate">{item.account}</div>
+                                <div className="text-muted-foreground font-mono">
+                                  {item.value.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   ) : (
-                    <div className="flex items-center justify-center h-[400px] text-muted-foreground text-sm">
-                      Aucune donnée pour cette période
+                    <div className="flex items-center justify-center w-full h-[350px] text-muted-foreground text-sm">
+                      Aucune donnée pour cette catégorie
                     </div>
                   )}
                 </CardContent>
