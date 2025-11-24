@@ -332,7 +332,7 @@ export default function Dashboard() {
     'hsl(var(--chart-5))',
   ];
 
-  // Comparison Data for Bar Chart - Full detailed version with all categories
+  // Comparison Data for Bar Chart - Full detailed version with all categories and sub-accounts
   const comparisonDataFull = useMemo(() => {
     const yearsSet = new Set<number>();
     const accountsMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
@@ -344,6 +344,16 @@ export default function Dashboard() {
     const years = Array.from(yearsSet).sort();
     
     const dataByCategory: Record<string, Record<number, number>> = {};
+    const dataBySubAccount: Record<string, Record<number, number>> = {};
+    
+    // Initialize sub-account data for ALL accounts
+    accounts.forEach(acc => {
+      const subAccountKey = `${acc.number} - ${acc.name}`;
+      dataBySubAccount[subAccountKey] = {};
+      years.forEach(year => {
+        dataBySubAccount[subAccountKey][year] = 0;
+      });
+    });
     
     transactions.forEach(txn => {
       const year = new Date(parseISO(txn.date)).getFullYear();
@@ -352,18 +362,21 @@ export default function Dashboard() {
       
       const categoryCode = accountInfo.number.substring(0, 2);
       const categoryLabel = CATEGORIE_LABELS[categoryCode] || `Catégorie ${categoryCode}`;
-      const key = `${categoryCode} - ${categoryLabel}`;
+      const categoryKey = `${categoryCode} - ${categoryLabel}`;
+      const subAccountKey = `${accountInfo.number} - ${accountInfo.name}`;
       
-      if (!dataByCategory[key]) {
-        dataByCategory[key] = {};
+      if (!dataByCategory[categoryKey]) {
+        dataByCategory[categoryKey] = {};
       }
       
       const amount = txn.debit - txn.credit;
-      dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+      dataByCategory[categoryKey][year] = (dataByCategory[categoryKey][year] || 0) + amount;
+      dataBySubAccount[subAccountKey][year] = (dataBySubAccount[subAccountKey][year] || 0) + amount;
     });
 
     // For balance sheet accounts (1xxx, 2xxx), calculate cumulative balances
     const finalDataByCategory: Record<string, Record<number, number>> = {};
+    const finalDataBySubAccount: Record<string, Record<number, number>> = {};
     
     Object.entries(dataByCategory).forEach(([category, yearData]) => {
       const categoryCode = category.substring(0, 2);
@@ -379,13 +392,34 @@ export default function Dashboard() {
         finalDataByCategory[category] = yearData;
       }
     });
+    
+    Object.entries(dataBySubAccount).forEach(([subAccount, yearData]) => {
+      const categoryCode = subAccount.substring(0, 2);
+      finalDataBySubAccount[subAccount] = {};
+      
+      if (categoryCode.startsWith('1') || categoryCode.startsWith('2')) {
+        let cumulative = 0;
+        years.forEach(year => {
+          cumulative += yearData[year] || 0;
+          finalDataBySubAccount[subAccount][year] = cumulative;
+        });
+      } else {
+        finalDataBySubAccount[subAccount] = yearData;
+      }
+    });
 
-    // Transform to recharts format
+    // Transform to recharts format - include both categories and sub-accounts
     const chartData = years.map(year => ({
       year: year.toString(),
       ...Object.fromEntries(
         Object.entries(finalDataByCategory).map(([category, data]) => [
           category,
+          Math.abs(data[year] || 0)
+        ])
+      ),
+      ...Object.fromEntries(
+        Object.entries(finalDataBySubAccount).map(([subAccount, data]) => [
+          subAccount,
           Math.abs(data[year] || 0)
         ])
       )
