@@ -544,8 +544,8 @@ export default function Dashboard() {
 
             {/* Tab 1: Evolution */}
             <TabsContent value="evolution" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <Card className="lg:col-span-2" ref={chartRef}>
+              <div className="grid grid-cols-1 gap-6">
+                  <Card ref={chartRef}>
                     <CardHeader>
                         <CardTitle>Évolution {isAggregatedView ? "Globale (Somme)" : "Détaillée"}</CardTitle>
                         <CardDescription>
@@ -615,116 +615,6 @@ export default function Dashboard() {
                       )}
                     </CardContent>
                   </Card>
-
-                  <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Card>
-                          <CardHeader>
-                              <CardTitle>Répartition Charges</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                                {pieChartDataCharges.length > 0 ? (
-                                    <div className="space-y-4">
-                                        <div style={{ width: '100%', height: '280px' }}>
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={pieChartDataCharges}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={50}
-                                                        outerRadius={90}
-                                                        paddingAngle={1}
-                                                        dataKey="value"
-                                                    >
-                                                        {pieChartDataCharges.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {(() => {
-                                              const total = pieChartDataCharges.reduce((sum, item) => sum + item.value, 0);
-                                              return pieChartDataCharges.map((item, idx) => {
-                                                const pct = ((item.value / total) * 100).toFixed(1);
-                                                return (
-                                                  <div key={idx} className="flex items-center justify-between text-sm">
-                                                    <div className="flex items-center gap-2">
-                                                      <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}></div>
-                                                      <span className="text-muted-foreground text-xs truncate">{item.name}</span>
-                                                    </div>
-                                                    <span className="font-mono font-semibold text-xs">{pct}%</span>
-                                                  </div>
-                                                );
-                                              });
-                                            })()}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-center h-[450px] text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
-                                        Aucune donnée
-                                    </div>
-                                )}
-                          </CardContent>
-                      </Card>
-
-                      <Card>
-                          <CardHeader>
-                              <CardTitle>Répartition Produits</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                                {pieChartDataProduits.length > 0 ? (
-                                    <div className="space-y-4">
-                                        <div style={{ width: '100%', height: '280px' }}>
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={pieChartDataProduits}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={50}
-                                                        outerRadius={90}
-                                                        paddingAngle={1}
-                                                        dataKey="value"
-                                                    >
-                                                        {pieChartDataProduits.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="space-y-2 max-h-[180px] overflow-y-auto">
-                                            {(() => {
-                                              const total = pieChartDataProduits.reduce((sum, item) => sum + item.value, 0);
-                                              return pieChartDataProduits.map((item, idx) => {
-                                                const pct = ((item.value / total) * 100).toFixed(1);
-                                                return (
-                                                  <div key={idx} className="flex items-center justify-between text-sm">
-                                                    <div className="flex items-center gap-2">
-                                                      <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}></div>
-                                                      <span className="text-muted-foreground text-xs truncate">{item.name}</span>
-                                                    </div>
-                                                    <span className="font-mono font-semibold text-xs">{pct}%</span>
-                                                  </div>
-                                                );
-                                              });
-                                            })()}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-center h-[450px] text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
-                                        Aucune donnée
-                                    </div>
-                                )}
-                          </CardContent>
-                      </Card>
-                      </div>
-                  </div>
               </div>
             </TabsContent>
 
