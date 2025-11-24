@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { parseISO, startOfYear, endOfYear } from "date-fns";
 import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CategoryData {
   name: string;
@@ -21,6 +22,22 @@ export default function PieChartsPage() {
   const accounts = data?.accounts || MOCK_ACCOUNTS;
   const transactions = data?.transactions || MOCK_TRANSACTIONS;
 
+  // Extract available years from transactions
+  const availableYears = useMemo(() => {
+    const years = new Set(transactions.map(t => new Date(parseISO(t.date)).getFullYear()));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [transactions]);
+
+  // State for selected year
+  const [selectedYear, setSelectedYear] = useState<string>("");
+
+  // Initialize selected year to the latest year on first load
+  useEffect(() => {
+    if (!selectedYear && availableYears.length > 0) {
+      setSelectedYear(availableYears[0].toString());
+    }
+  }, [availableYears, selectedYear]);
+
   // Define the 4 main categories
   const categories: CategoryData[] = [
     { name: "Actifs", prefix: ["1"], label: "Comptes 1XXXXX" },
@@ -31,10 +48,12 @@ export default function PieChartsPage() {
 
   // Calculate pie chart data for each category (annual only)
   const chartDataByCategory = useMemo(() => {
-    const now = new Date();
+    if (!selectedYear) return {};
+
+    const year = parseInt(selectedYear);
     const dateRange = { 
-      start: startOfYear(now), 
-      end: endOfYear(now) 
+      start: startOfYear(new Date(year, 0, 1)), 
+      end: endOfYear(new Date(year, 0, 1))
     };
 
     const result: Record<string, Array<{ name: string; value: number; account: string }>> = {};
@@ -89,7 +108,7 @@ export default function PieChartsPage() {
     });
 
     return result;
-  }, [transactions, accounts, categories]);
+  }, [transactions, accounts, selectedYear, categories]);
 
   // Colors for pie charts
   const PIE_COLORS = [
@@ -104,13 +123,32 @@ export default function PieChartsPage() {
     <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => setLocation("/dashboard")}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Retour
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Visualisation par Graphiques Circulaires</h1>
-            <p className="text-muted-foreground">Analyse par catégories comptables - Année en cours</p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="sm" onClick={() => setLocation("/dashboard")}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Retour
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Visualisation par Graphiques Circulaires</h1>
+              <p className="text-muted-foreground">Évolution Détaillée</p>
+            </div>
+          </div>
+
+          {/* Year Selection */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium">Années pour graphiques:</label>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-32" data-testid="select-year">
+                <SelectValue placeholder="Sélectionner une année" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
