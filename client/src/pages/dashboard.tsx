@@ -586,7 +586,9 @@ export default function Dashboard() {
     };
   }, [selectedYearForResume, transactions, accounts, balanceSheet, incomeStatement]);
 
-  const netResult = resumeDataByYear.incomeStatement.reduce((acc, item) => acc + item.amount, 0);
+  // Get Net Result from account 2979
+  const netResultAmount = resumeDataByYear.balanceSheet.find(item => item.accountNumber === "2979")?.amount || 0;
+  const netResult = netResultAmount;
   const isAggregatedView = selectedAccounts.length === 0 && selectedCategory !== "Tous les comptes";
 
   return (
@@ -807,6 +809,7 @@ export default function Dashboard() {
               <TabsTrigger value="graphiques" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Graphiques</TabsTrigger>
               <TabsTrigger value="details" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Détails</TabsTrigger>
               <TabsTrigger value="resume" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Résumé</TabsTrigger>
+              <TabsTrigger value="ratios" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Ratios</TabsTrigger>
               <TabsTrigger value="infos" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Infos</TabsTrigger>
             </TabsList>
 
@@ -1296,7 +1299,173 @@ export default function Dashboard() {
                 </Card>
             </TabsContent>
 
-            {/* Tab 6: Infos */}
+            {/* Tab 6: Ratios */}
+            <TabsContent value="ratios" className="space-y-6">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Ratios Financiers Détaillés</h3>
+                  <p className="text-sm text-muted-foreground mb-6">Analyse complète avec méthodes de calcul</p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Liquidité */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Wallet className="h-4 w-4" /> Liquidité courante
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Formule :</p>
+                        <p className="text-xs font-mono bg-background p-2 rounded border">Actifs circulants (10x-13x) / Passifs court terme (20x-23x)</p>
+                      </div>
+                      <div className="p-3 bg-blue-50/30 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Interprétation :</p>
+                        <p className="text-xs text-muted-foreground">Mesure la capacité à couvrir les dettes à court terme. Idéal : &gt; 1.5</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <p className="text-sm font-bold">{ratios.find(r => r.name === "Liquidité courante")?.value.toFixed(2) || "N/A"} {ratios.find(r => r.name === "Liquidité courante")?.unit}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Liquidité immédiate */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Wallet className="h-4 w-4" /> Liquidité immédiate
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Formule :</p>
+                        <p className="text-xs font-mono bg-background p-2 rounded border">(Actifs circulants - Stocks) / Passifs court terme</p>
+                      </div>
+                      <div className="p-3 bg-blue-50/30 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Interprétation :</p>
+                        <p className="text-xs text-muted-foreground">Liquidité sans les stocks. Idéal : ≥ 1</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <p className="text-sm font-bold">{ratios.find(r => r.name === "Liquidité immédiate")?.value.toFixed(2) || "N/A"} {ratios.find(r => r.name === "Liquidité immédiate")?.unit}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Marge nette */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" /> Marge nette
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Formule :</p>
+                        <p className="text-xs font-mono bg-background p-2 rounded border">(Résultat Net / Chiffre d'affaires) × 100</p>
+                      </div>
+                      <div className="p-3 bg-blue-50/30 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Interprétation :</p>
+                        <p className="text-xs text-muted-foreground">Pourcentage du CA converti en profit. Idéal : &gt; 10%</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <p className="text-sm font-bold">{ratios.find(r => r.name === "Marge nette")?.value.toFixed(1) || "N/A"}%</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* ROA */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" /> ROA (Rentabilité des actifs)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Formule :</p>
+                        <p className="text-xs font-mono bg-background p-2 rounded border">(Résultat Net / Total Actif) × 100</p>
+                      </div>
+                      <div className="p-3 bg-blue-50/30 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Interprétation :</p>
+                        <p className="text-xs text-muted-foreground">Efficacité à générer du profit avec les actifs. Idéal : &gt; 5%</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <p className="text-sm font-bold">{ratios.find(r => r.name === "ROA")?.value.toFixed(1) || "N/A"}%</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* ROE */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" /> ROE (Rentabilité fonds propres)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Formule :</p>
+                        <p className="text-xs font-mono bg-background p-2 rounded border">(Résultat Net / Capitaux Propres) × 100</p>
+                      </div>
+                      <div className="p-3 bg-blue-50/30 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Interprétation :</p>
+                        <p className="text-xs text-muted-foreground">Rentabilité pour les actionnaires. Idéal : &gt; 10%</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <p className="text-sm font-bold">{ratios.find(r => r.name === "ROE")?.value.toFixed(1) || "N/A"}%</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Marge EBITDA */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" /> Marge EBITDA
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Formule :</p>
+                        <p className="text-xs font-mono bg-background p-2 rounded border">(CA - Coûts directs - Charges) / CA × 100</p>
+                      </div>
+                      <div className="p-3 bg-blue-50/30 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Interprétation :</p>
+                        <p className="text-xs text-muted-foreground">Rentabilité opérationnelle avant amortissements. Idéal : &gt; 15%</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <p className="text-sm font-bold">{ratios.find(r => r.name === "Marge EBITDA")?.value.toFixed(1) || "N/A"}%</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Ratio fonds propres */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Wallet className="h-4 w-4" /> Ratio fonds propres
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Formule :</p>
+                        <p className="text-xs font-mono bg-background p-2 rounded border">Capitaux propres / Total Actif</p>
+                      </div>
+                      <div className="p-3 bg-blue-50/30 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Interprétation :</p>
+                        <p className="text-xs text-muted-foreground">Indépendance financière. Idéal : 30-60%</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <p className="text-sm font-bold">{((ratios.find(r => r.name === "Ratio fonds propres")?.value || 0) * 100).toFixed(1)}%</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Tab 7: Infos */}
             <TabsContent value="infos" className="space-y-6">
               <Card className="border border-blue-200/50 bg-blue-50/30 dark:bg-blue-900/10">
                 <CardHeader>
