@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Check } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Check, Info } from "lucide-react";
 import { processGLFile } from "@/lib/excel-processor";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
@@ -146,6 +146,31 @@ export default function UploadPage() {
                 <p>Génération Dashboard</p>
             </div>
         </div>
+
+        <Card className="border border-amber-200/50 bg-amber-50/30 dark:bg-amber-900/10">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                    <Info className="h-5 w-5 text-amber-600" />
+                    Information sur le stockage des données
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+                <div className="space-y-2">
+                    <p className="flex items-start gap-2">
+                        <span className="text-amber-600 font-semibold mt-0.5">•</span>
+                        <span><strong>Stockage en mémoire :</strong> Les données Excel sont chargées et stockées en mémoire (contexte React) pour accélérer l'analyse.</span>
+                    </p>
+                    <p className="flex items-start gap-2">
+                        <span className="text-amber-600 font-semibold mt-0.5">•</span>
+                        <span><strong>Données temporaires :</strong> Les données disparaissent si vous rafraîchissez la page. Téléchargez les rapports avant de quitter.</span>
+                    </p>
+                    <p className="flex items-start gap-2">
+                        <span className="text-amber-600 font-semibold mt-0.5">•</span>
+                        <span><strong>Remplacement :</strong> Chaque fois que vous chargez un nouveau fichier, il remplace les données précédentes.</span>
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
       </div>
     </div>
   );
