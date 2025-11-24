@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Minus, RotateCcw } from "lucide-react";
+import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Minus, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
@@ -43,6 +43,9 @@ export default function Dashboard() {
   const [accountSearchTerm, setAccountSearchTerm] = useState<string>("");
   const [detailsSearchTerm, setDetailsSearchTerm] = useState<string>("");
   const [selectedYearForPie, setSelectedYearForPie] = useState<string>("");
+  const [selectedCategoriesComparison, setSelectedCategoriesComparison] = useState<string[]>([]);
+  const [expandedCategoryComparison, setExpandedCategoryComparison] = useState<string | null>(null);
+  const [selectedSubAccountsComparison, setSelectedSubAccountsComparison] = useState<string[]>([]);
 
   // Extract available years from transactions
   const availableYears = useMemo(() => {
@@ -329,8 +332,8 @@ export default function Dashboard() {
     'hsl(var(--chart-5))',
   ];
 
-  // Comparison Data for Bar Chart
-  const comparisonData = useMemo(() => {
+  // Comparison Data for Bar Chart - Full detailed version with all categories
+  const comparisonDataFull = useMemo(() => {
     const yearsSet = new Set<number>();
     const accountsMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
     
@@ -393,8 +396,34 @@ export default function Dashboard() {
       .map(([category, _]) => category)
       .sort();
 
-    return { chartData, years, allCategories: allCategoriesFiltered };
+    // Build sub-accounts list for each category
+    const subAccountsByCategory: Record<string, { id: string, number: string, name: string }[]> = {};
+    accounts.forEach(acc => {
+      const categoryCode = acc.number.substring(0, 2);
+      const categoryLabel = CATEGORIE_LABELS[categoryCode] || `Catégorie ${categoryCode}`;
+      const key = `${categoryCode} - ${categoryLabel}`;
+      
+      if (!subAccountsByCategory[key]) {
+        subAccountsByCategory[key] = [];
+      }
+      subAccountsByCategory[key].push({ id: acc.id, number: acc.number, name: acc.name });
+    });
+
+    return { chartData, years, allCategories: allCategoriesFiltered, subAccountsByCategory };
   }, [transactions, accounts]);
+
+  // Display categories for comparison chart
+  const displayCategoriesComparison = useMemo(() => {
+    if (selectedSubAccountsComparison.length > 0) {
+      return selectedSubAccountsComparison
+        .map(id => {
+          const acc = accounts.find(a => a.id === id);
+          return acc ? `${acc.number} - ${acc.name}` : null;
+        })
+        .filter(Boolean) as string[];
+    }
+    return selectedCategoriesComparison.length > 0 ? selectedCategoriesComparison : comparisonDataFull.allCategories;
+  }, [selectedSubAccountsComparison, selectedCategoriesComparison, comparisonDataFull.allCategories, accounts]);
 
   // Pie Chart Data by Categories (Actifs, Passifs, Produits, Charges)
   const pieChartCategories = useMemo(() => {
@@ -760,35 +789,107 @@ export default function Dashboard() {
 
             {/* Tab 2: Comparison */}
             <TabsContent value="comparison" className="space-y-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold">Comparaison Annuelle</h3>
-                  <p className="text-sm text-muted-foreground">Analyse comparative des catégories par année</p>
-                </div>
-              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <Card className="lg:col-span-3">
+                  <CardHeader>
+                    <CardTitle>Montants par Année et Catégorie</CardTitle>
+                    <CardDescription>Sélectionnez les catégories à afficher pour une comparaison détaillée</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-[400px]">
+                    {comparisonDataFull.chartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={comparisonDataFull.chartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                          <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                          <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
+                          <Legend wrapperStyle={{ fontSize: '11px', maxHeight: '100px' }} />
+                          {displayCategoriesComparison.map((category, index) => (
+                            <Bar key={category} dataKey={category} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Aucune donnée disponible
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardContent className="h-[450px] pt-6">
-                  {comparisonData.chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={comparisonData.chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                        <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
-                        <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
-                        <Legend wrapperStyle={{ fontSize: '11px', maxHeight: '100px' }} />
-                        {comparisonData.allCategories.slice(0, 5).map((category, index) => (
-                          <Bar key={category} dataKey={category} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      Aucune donnée disponible
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Sélection Catégories</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="max-h-[400px] overflow-y-auto space-y-2">
+                      {comparisonDataFull.allCategories.map((category) => (
+                        <div key={category} className="border rounded-md p-2 space-y-2 bg-muted/30">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setExpandedCategoryComparison(expandedCategoryComparison === category ? null : category)}
+                              className="p-1 hover:bg-muted rounded"
+                            >
+                              {expandedCategoryComparison === category ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            </button>
+                            <Checkbox
+                              checked={selectedCategoriesComparison.includes(category)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedCategoriesComparison([...selectedCategoriesComparison, category]);
+                                } else {
+                                  setSelectedCategoriesComparison(selectedCategoriesComparison.filter(a => a !== category));
+                                  setSelectedSubAccountsComparison(selectedSubAccountsComparison.filter(id => {
+                                    const acc = accounts.find(a => a.id === id);
+                                    return !acc?.number.startsWith(category.substring(0, 2));
+                                  }));
+                                }
+                              }}
+                            />
+                            <label className="text-xs cursor-pointer flex-1">{category}</label>
+                          </div>
+
+                          {expandedCategoryComparison === category && (
+                            <div className="ml-6 border-l border-muted pl-2 space-y-1">
+                              {comparisonDataFull.subAccountsByCategory[category]?.map((subAcc) => (
+                                <div key={subAcc.id} className="flex items-center gap-2">
+                                  <Checkbox
+                                    checked={selectedSubAccountsComparison.includes(subAcc.id)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedSubAccountsComparison([...selectedSubAccountsComparison, subAcc.id]);
+                                      } else {
+                                        setSelectedSubAccountsComparison(selectedSubAccountsComparison.filter(id => id !== subAcc.id));
+                                      }
+                                    }}
+                                  />
+                                  <label className="text-xs cursor-pointer">
+                                    <span className="font-mono font-bold text-[10px]">{subAcc.number}</span> <span className="text-[10px]">{subAcc.name}</span>
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                    {(selectedCategoriesComparison.length > 0 || selectedSubAccountsComparison.length > 0) && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => {
+                          setSelectedCategoriesComparison([]);
+                          setSelectedSubAccountsComparison([]);
+                          setExpandedCategoryComparison(null);
+                        }}
+                      >
+                        Réinitialiser
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             {/* Tab 3: Graphiques */}
