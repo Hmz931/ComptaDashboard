@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [selectedCategoriesComparison, setSelectedCategoriesComparison] = useState<string[]>([]);
   const [expandedCategoryComparison, setExpandedCategoryComparison] = useState<string | null>(null);
   const [selectedSubAccountsComparison, setSelectedSubAccountsComparison] = useState<string[]>([]);
+  const [selectedYearForResume, setSelectedYearForResume] = useState<string>("");
 
   // Extract available years from transactions
   const availableYears = useMemo(() => {
@@ -61,7 +62,10 @@ export default function Dashboard() {
     if (!selectedYearForPie && availableYears.length > 0) {
       setSelectedYearForPie(availableYears[availableYears.length - 1].toString());
     }
-  }, [availableYears, selectedYearForPie]);
+    if (!selectedYearForResume && availableYears.length > 0) {
+      setSelectedYearForResume(availableYears[availableYears.length - 1].toString());
+    }
+  }, [availableYears, selectedYearForPie, selectedYearForResume]);
 
   // Calculate default date range from actual data
   const defaultDateRange = useMemo(() => {
@@ -520,7 +524,69 @@ export default function Dashboard() {
     return result;
   }, [transactions, accounts, selectedYearForPie]);
 
-  const netResult = incomeStatement.reduce((acc, item) => acc + item.amount, 0);
+  // Calculate Balance Sheet and Income Statement for selected year
+  const resumeDataByYear = useMemo(() => {
+    if (!selectedYearForResume) {
+      return { balanceSheet: balanceSheet, incomeStatement: incomeStatement };
+    }
+
+    const year = parseInt(selectedYearForResume);
+    const yearStart = startOfYear(new Date(year, 0, 1));
+    const yearEnd = endOfYear(new Date(year, 0, 1));
+
+    const accountsMap = new Map(accounts.map(a => [a.id, a]));
+    
+    // Filter transactions for the selected year
+    const yearTransactions = transactions.filter(txn => {
+      const txnDate = parseISO(txn.date);
+      return txnDate >= yearStart && txnDate <= yearEnd;
+    });
+
+    // Calculate Balance Sheet (cumulative for asset/liability accounts)
+    const bsData: Record<string, { name: string; amount: number; number: string }> = {};
+    
+    yearTransactions.forEach(txn => {
+      const account = accountsMap.get(txn.accountId);
+      if (!account || (!account.number.startsWith('1') && !account.number.startsWith('2'))) return;
+      
+      if (!bsData[account.id]) {
+        bsData[account.id] = { name: account.name, number: account.number, amount: 0 };
+      }
+      bsData[account.id].amount += txn.debit - txn.credit;
+    });
+
+    const newBalanceSheet = Object.entries(bsData).map(([id, data]) => ({
+      accountNumber: data.number,
+      accountName: data.name,
+      amount: data.amount
+    }));
+
+    // Calculate Income Statement (sum for P&L accounts)
+    const isData: Record<string, { name: string; amount: number; number: string }> = {};
+    
+    yearTransactions.forEach(txn => {
+      const account = accountsMap.get(txn.accountId);
+      if (!account || (account.number.startsWith('1') || account.number.startsWith('2'))) return;
+      
+      if (!isData[account.id]) {
+        isData[account.id] = { name: account.name, number: account.number, amount: 0 };
+      }
+      isData[account.id].amount += txn.debit - txn.credit;
+    });
+
+    const newIncomeStatement = Object.entries(isData).map(([id, data]) => ({
+      accountNumber: data.number,
+      accountName: data.name,
+      amount: data.amount
+    }));
+
+    return { 
+      balanceSheet: newBalanceSheet.length > 0 ? newBalanceSheet : balanceSheet,
+      incomeStatement: newIncomeStatement.length > 0 ? newIncomeStatement : incomeStatement
+    };
+  }, [selectedYearForResume, transactions, accounts, balanceSheet, incomeStatement]);
+
+  const netResult = resumeDataByYear.incomeStatement.reduce((acc, item) => acc + item.amount, 0);
   const isAggregatedView = selectedAccounts.length === 0 && selectedCategory !== "Tous les comptes";
 
   return (
@@ -1100,10 +1166,29 @@ export default function Dashboard() {
 
             {/* Tab 5: Resume */}
             <TabsContent value="resume" className="space-y-6">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">Situation financière</h3>
+                    <p className="text-sm text-muted-foreground">Bilan et Compte de Résultat par année</p>
+                  </div>
+                  <Select value={selectedYearForResume} onValueChange={setSelectedYearForResume}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Année" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableYears.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <Card className="lg:col-span-2">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" /> Bilan</CardTitle>
+                            <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" /> Bilan {selectedYearForResume}</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-6">
@@ -1112,7 +1197,7 @@ export default function Dashboard() {
                                     <div className="max-h-[400px] overflow-y-auto">
                                     <Table className="text-sm">
                                         <TableBody>
-                                            {balanceSheet.filter(i => i.accountNumber.startsWith('1')).map((item) => (
+                                            {resumeDataByYear.balanceSheet.filter(i => i.accountNumber.startsWith('1')).map((item) => (
                                                 <TableRow key={item.accountNumber}>
                                                     <TableCell className="text-xs"><span className="font-mono font-bold">{item.accountNumber}</span></TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">{item.accountName}</TableCell>
@@ -1128,7 +1213,7 @@ export default function Dashboard() {
                                     <div className="max-h-[400px] overflow-y-auto">
                                     <Table className="text-sm">
                                         <TableBody>
-                                            {balanceSheet.filter(i => i.accountNumber.startsWith('2')).map((item) => (
+                                            {resumeDataByYear.balanceSheet.filter(i => i.accountNumber.startsWith('2')).map((item) => (
                                                 <TableRow key={item.accountNumber}>
                                                     <TableCell className="text-xs"><span className="font-mono font-bold">{item.accountNumber}</span></TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">{item.accountName}</TableCell>
@@ -1183,7 +1268,7 @@ export default function Dashboard() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Compte de Résultat</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Compte de Résultat {selectedYearForResume}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <Table className="text-sm">
@@ -1194,7 +1279,7 @@ export default function Dashboard() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {incomeStatement.map((item) => (
+                                {resumeDataByYear.incomeStatement.map((item) => (
                                     <TableRow key={item.accountNumber}>
                                         <TableCell className="text-xs">
                                             <span className="font-mono font-bold mr-2">{item.accountNumber}</span>
