@@ -204,9 +204,9 @@ export default function PieChartsPage() {
                       </div>
 
                       {/* Legend List */}
-                      <div className="w-56 flex flex-col gap-2 overflow-y-auto pr-2">
+                      <div className="w-56 flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-2">
                         {pieData.map((item, index) => (
-                          <div key={item.account} className="text-xs p-2 rounded-md bg-muted/50 border border-border">
+                          <div key={item.account} className="text-xs p-2 rounded-md bg-muted/50 border border-border flex-shrink-0">
                             <div className="flex items-start gap-2">
                               <div 
                                 className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
