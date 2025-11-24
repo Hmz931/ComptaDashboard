@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, ArrowUpRight, ArrowDownRight, Minus, RotateCcw } from "lucide-react";
+import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Minus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
@@ -352,6 +352,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant="link" size="sm" onClick={() => setLocation("/comparison")}>
                   <BarChart3 className="mr-2 h-4 w-4" /> Comparaison
+                </Button>
+                <Button variant="link" size="sm" onClick={() => setLocation("/pie-charts")}>
+                  <PieChartIcon className="mr-2 h-4 w-4" /> Graphiques
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
