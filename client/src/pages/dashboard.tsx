@@ -541,11 +541,9 @@ export default function Dashboard() {
                 <Button variant="outline" size="sm" onClick={() => { setSelectedCategory("Tous les comptes"); setSelectedAccounts([]); setDateRange(defaultDateRange); }} data-testid="button-reset-filters">
                   <RotateCcw className="mr-2 h-4 w-4" /> Réinitialiser
                 </Button>
-                {!data && (
-                     <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
-                        <UploadPageIcon className="mr-2 h-4 w-4" /> Nouvel Import
-                     </Button>
-                )}
+                <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-load-new-file">
+                   <Upload className="mr-2 h-4 w-4" /> Charger Données
+                </Button>
                 <Button variant="link" size="sm" onClick={() => setLocation("/ratios")}>
                   <FileText className="mr-2 h-4 w-4" /> Ratios
                 </Button>
