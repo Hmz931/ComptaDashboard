@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Minus, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
+import { Upload, Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Minus, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
