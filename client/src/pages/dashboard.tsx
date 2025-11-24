@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [expandedCategoryComparison, setExpandedCategoryComparison] = useState<string | null>(null);
   const [selectedSubAccountsComparison, setSelectedSubAccountsComparison] = useState<string[]>([]);
   const [selectedYearForResume, setSelectedYearForResume] = useState<string>("");
+  const [selectedPeriodComparison, setSelectedPeriodComparison] = useState<"Annuel" | "Semestriel" | "Trimestriel" | "Mensuel">("Annuel");
 
   // Extract available years from transactions
   const availableYears = useMemo(() => {
@@ -336,31 +337,62 @@ export default function Dashboard() {
     'hsl(var(--chart-5))',
   ];
 
-  // Comparison Data for Bar Chart - Full detailed version with all categories and sub-accounts
+  // Helper function to format period label based on type
+  const getPeriodLabel = (date: Date, periodType: "Annuel" | "Semestriel" | "Trimestriel" | "Mensuel"): string => {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const quarter = Math.ceil(month / 3);
+    const semester = Math.ceil(month / 6);
+
+    switch (periodType) {
+      case "Annuel":
+        return year.toString();
+      case "Semestriel":
+        return `${year} - S${semester}`;
+      case "Trimestriel":
+        return `${year} - Q${quarter}`;
+      case "Mensuel":
+        return `${month.toString().padStart(2, '0')}/${year}`;
+      default:
+        return year.toString();
+    }
+  };
+
+  // Comparison Data for Bar Chart - Grouped by Period
   const comparisonDataFull = useMemo(() => {
-    const yearsSet = new Set<number>();
+    const periodsSet = new Set<string>();
     const accountsMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
     
     transactions.forEach(txn => {
-      yearsSet.add(new Date(parseISO(txn.date)).getFullYear());
+      const date = new Date(parseISO(txn.date));
+      const periodLabel = getPeriodLabel(date, selectedPeriodComparison);
+      periodsSet.add(periodLabel);
     });
 
-    const years = Array.from(yearsSet).sort();
+    // Sort periods
+    const periods = Array.from(periodsSet).sort((a, b) => {
+      if (selectedPeriodComparison === "Annuel") {
+        return parseInt(a) - parseInt(b);
+      } else {
+        return a.localeCompare(b);
+      }
+    });
     
-    const dataByCategory: Record<string, Record<number, number>> = {};
-    const dataBySubAccount: Record<string, Record<number, number>> = {};
+    const dataByCategory: Record<string, Record<string, number>> = {};
+    const dataBySubAccount: Record<string, Record<string, number>> = {};
     
     // Initialize sub-account data for ALL accounts
     accounts.forEach(acc => {
       const subAccountKey = `${acc.number} - ${acc.name}`;
       dataBySubAccount[subAccountKey] = {};
-      years.forEach(year => {
-        dataBySubAccount[subAccountKey][year] = 0;
+      periods.forEach(period => {
+        dataBySubAccount[subAccountKey][period] = 0;
       });
     });
     
     transactions.forEach(txn => {
-      const year = new Date(parseISO(txn.date)).getFullYear();
+      const date = new Date(parseISO(txn.date));
+      const period = getPeriodLabel(date, selectedPeriodComparison);
       const accountInfo = accountsMap.get(txn.accountId);
       if (!accountInfo) return;
       
@@ -374,57 +406,57 @@ export default function Dashboard() {
       }
       
       const amount = txn.debit - txn.credit;
-      dataByCategory[categoryKey][year] = (dataByCategory[categoryKey][year] || 0) + amount;
-      dataBySubAccount[subAccountKey][year] = (dataBySubAccount[subAccountKey][year] || 0) + amount;
+      dataByCategory[categoryKey][period] = (dataByCategory[categoryKey][period] || 0) + amount;
+      dataBySubAccount[subAccountKey][period] = (dataBySubAccount[subAccountKey][period] || 0) + amount;
     });
 
     // For balance sheet accounts (1xxx, 2xxx), calculate cumulative balances
-    const finalDataByCategory: Record<string, Record<number, number>> = {};
-    const finalDataBySubAccount: Record<string, Record<number, number>> = {};
+    const finalDataByCategory: Record<string, Record<string, number>> = {};
+    const finalDataBySubAccount: Record<string, Record<string, number>> = {};
     
-    Object.entries(dataByCategory).forEach(([category, yearData]) => {
+    Object.entries(dataByCategory).forEach(([category, periodData]) => {
       const categoryCode = category.substring(0, 2);
       finalDataByCategory[category] = {};
       
       if (categoryCode.startsWith('1') || categoryCode.startsWith('2')) {
         let cumulative = 0;
-        years.forEach(year => {
-          cumulative += yearData[year] || 0;
-          finalDataByCategory[category][year] = cumulative;
+        periods.forEach(period => {
+          cumulative += periodData[period] || 0;
+          finalDataByCategory[category][period] = cumulative;
         });
       } else {
-        finalDataByCategory[category] = yearData;
+        finalDataByCategory[category] = periodData;
       }
     });
     
-    Object.entries(dataBySubAccount).forEach(([subAccount, yearData]) => {
+    Object.entries(dataBySubAccount).forEach(([subAccount, periodData]) => {
       const categoryCode = subAccount.substring(0, 2);
       finalDataBySubAccount[subAccount] = {};
       
       if (categoryCode.startsWith('1') || categoryCode.startsWith('2')) {
         let cumulative = 0;
-        years.forEach(year => {
-          cumulative += yearData[year] || 0;
-          finalDataBySubAccount[subAccount][year] = cumulative;
+        periods.forEach(period => {
+          cumulative += periodData[period] || 0;
+          finalDataBySubAccount[subAccount][period] = cumulative;
         });
       } else {
-        finalDataBySubAccount[subAccount] = yearData;
+        finalDataBySubAccount[subAccount] = periodData;
       }
     });
 
     // Transform to recharts format - include both categories and sub-accounts
-    const chartData = years.map(year => ({
-      year: year.toString(),
+    const chartData = periods.map(period => ({
+      period: period,
       ...Object.fromEntries(
         Object.entries(finalDataByCategory).map(([category, data]) => [
           category,
-          Math.abs(data[year] || 0)
+          Math.abs(data[period] || 0)
         ])
       ),
       ...Object.fromEntries(
         Object.entries(finalDataBySubAccount).map(([subAccount, data]) => [
           subAccount,
-          Math.abs(data[year] || 0)
+          Math.abs(data[period] || 0)
         ])
       )
     }));
@@ -447,8 +479,8 @@ export default function Dashboard() {
       subAccountsByCategory[key].push({ id: acc.id, number: acc.number, name: acc.name });
     });
 
-    return { chartData, years, allCategories: allCategoriesFiltered, subAccountsByCategory };
-  }, [transactions, accounts]);
+    return { chartData, periods, allCategories: allCategoriesFiltered, subAccountsByCategory };
+  }, [transactions, accounts, selectedPeriodComparison]);
 
   // Display categories for comparison chart
   const displayCategoriesComparison = useMemo(() => {
@@ -894,15 +926,30 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                 <Card className="lg:col-span-3">
                   <CardHeader>
-                    <CardTitle>Montants par Année et Catégorie</CardTitle>
-                    <CardDescription>Sélectionnez les catégories à afficher pour une comparaison détaillée</CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Montants par Période et Catégorie</CardTitle>
+                        <CardDescription>Sélectionnez les catégories à afficher pour une comparaison détaillée</CardDescription>
+                      </div>
+                      <Select value={selectedPeriodComparison} onValueChange={(value) => setSelectedPeriodComparison(value as "Annuel" | "Semestriel" | "Trimestriel" | "Mensuel")}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Sélectionner période" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Mensuel">Mensuel</SelectItem>
+                          <SelectItem value="Trimestriel">Trimestriel</SelectItem>
+                          <SelectItem value="Semestriel">Semestriel</SelectItem>
+                          <SelectItem value="Annuel">Annuel</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </CardHeader>
                   <CardContent className="h-[400px]">
                     {comparisonDataFull.chartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={comparisonDataFull.chartData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                          <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                          <XAxis dataKey="period" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                           <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
                           <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
                           <Legend wrapperStyle={{ fontSize: '11px', maxHeight: '100px' }} />
