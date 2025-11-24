@@ -617,63 +617,6 @@ export default function Dashboard() {
                   </Card>
 
                   <div className="space-y-6">
-                      <Card>
-                        <CardHeader>
-                            <CardTitle>Top Variations</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Compte</TableHead>
-                                        <TableHead className="text-right">Var.</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {summaryStats.slice(0, 5).map((stat) => (
-                                        <TableRow key={stat.account}>
-                                            <TableCell className="font-medium text-xs">
-                                                <div className="font-mono">{stat.account.split(' - ')[0]}</div>
-                                                <div className="truncate w-24 text-muted-foreground" title={stat.account.split(' - ')[1]}>{stat.account.split(' - ')[1]}</div>
-                                            </TableCell>
-                                            <TableCell className={cn("text-right font-mono font-bold text-xs", stat.variation >= 0 ? "text-emerald-600" : "text-red-600")}>
-                                                {stat.variation > 0 ? "+" : ""}{stat.variation.toLocaleString('fr-CH', { maximumFractionDigits: 0 })}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                      </Card>
-                      
-                      <div className="space-y-3">
-                          <div>
-                              <label className="text-sm font-medium block mb-2">Années pour graphiques:</label>
-                              <div className="flex gap-1 flex-wrap p-2 border rounded-md bg-muted/30">
-                                  {availableYears.map(year => (
-                                      <Button
-                                          key={year}
-                                          size="sm"
-                                          variant={selectedYearsForCharts.includes(year) ? "default" : "outline"}
-                                          className="h-6 px-2 text-xs"
-                                          onClick={() => {
-                                              if (selectedYearsForCharts.includes(year)) {
-                                                  setSelectedYearsForCharts(selectedYearsForCharts.filter(y => y !== year));
-                                              } else {
-                                                  setSelectedYearsForCharts([...selectedYearsForCharts, year]);
-                                              }
-                                          }}
-                                      >
-                                          {year}
-                                      </Button>
-                                  ))}
-                              </div>
-                              {selectedYearsForCharts.length === 0 && (
-                                  <p className="text-[10px] text-red-500 mt-1">Sélectionnez au moins une année</p>
-                              )}
-                          </div>
-                      </div>
-
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <Card>
                           <CardHeader>
