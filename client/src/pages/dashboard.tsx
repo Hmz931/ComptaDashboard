@@ -2,9 +2,9 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, BALANCE_SHEET as MOCK_BALANCE_SHEET, INCOME_STATEMENT as MOCK_INCOME_STATEMENT, CATEGORIES } from "@/lib/mockData";
+import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, BALANCE_SHEET as MOCK_BALANCE_SHEET, INCOME_STATEMENT as MOCK_INCOME_STATEMENT, CATEGORIES, CATEGORIE_LABELS } from "@/lib/mockData";
 import { format, parseISO, startOfYear, endOfYear } from "date-fns";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
@@ -317,6 +317,80 @@ export default function Dashboard() {
   }, [transactions, selectedYearsForCharts, accounts]);
 
   const PIE_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
+  const COLORS = [
+    'hsl(var(--chart-1))',
+    'hsl(var(--chart-2))',
+    'hsl(var(--chart-3))',
+    'hsl(var(--chart-4))',
+    'hsl(var(--chart-5))',
+  ];
+
+  // Comparison Data for Bar Chart
+  const comparisonData = useMemo(() => {
+    const yearsSet = new Set<number>();
+    const accountsMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
+    
+    transactions.forEach(txn => {
+      yearsSet.add(new Date(parseISO(txn.date)).getFullYear());
+    });
+
+    const years = Array.from(yearsSet).sort();
+    
+    const dataByCategory: Record<string, Record<number, number>> = {};
+    
+    transactions.forEach(txn => {
+      const year = new Date(parseISO(txn.date)).getFullYear();
+      const accountInfo = accountsMap.get(txn.accountId);
+      if (!accountInfo) return;
+      
+      const categoryCode = accountInfo.number.substring(0, 2);
+      const categoryLabel = CATEGORIE_LABELS[categoryCode] || `Catégorie ${categoryCode}`;
+      const key = `${categoryCode} - ${categoryLabel}`;
+      
+      if (!dataByCategory[key]) {
+        dataByCategory[key] = {};
+      }
+      
+      const amount = txn.debit - txn.credit;
+      dataByCategory[key][year] = (dataByCategory[key][year] || 0) + amount;
+    });
+
+    // For balance sheet accounts (1xxx, 2xxx), calculate cumulative balances
+    const finalDataByCategory: Record<string, Record<number, number>> = {};
+    
+    Object.entries(dataByCategory).forEach(([category, yearData]) => {
+      const categoryCode = category.substring(0, 2);
+      finalDataByCategory[category] = {};
+      
+      if (categoryCode.startsWith('1') || categoryCode.startsWith('2')) {
+        let cumulative = 0;
+        years.forEach(year => {
+          cumulative += yearData[year] || 0;
+          finalDataByCategory[category][year] = cumulative;
+        });
+      } else {
+        finalDataByCategory[category] = yearData;
+      }
+    });
+
+    // Transform to recharts format
+    const chartData = years.map(year => ({
+      year: year.toString(),
+      ...Object.fromEntries(
+        Object.entries(finalDataByCategory).map(([category, data]) => [
+          category,
+          Math.abs(data[year] || 0)
+        ])
+      )
+    }));
+
+    const allCategoriesFiltered = Object.entries(finalDataByCategory)
+      .filter(([_, data]) => Object.values(data).some(val => Math.abs(val) > 0))
+      .map(([category, _]) => category)
+      .sort();
+
+    return { chartData, years, allCategories: allCategoriesFiltered };
+  }, [transactions, accounts]);
 
   const netResult = incomeStatement.reduce((acc, item) => acc + item.amount, 0);
   const isAggregatedView = selectedAccounts.length === 0 && selectedCategory !== "Tous les comptes";
@@ -538,6 +612,7 @@ export default function Dashboard() {
             <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent gap-6">
               <TabsTrigger value="evolution" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Évolution</TabsTrigger>
               <TabsTrigger value="comparison" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Comparaison</TabsTrigger>
+              <TabsTrigger value="graphiques" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Graphiques</TabsTrigger>
               <TabsTrigger value="details" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Détails</TabsTrigger>
               <TabsTrigger value="resume" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Résumé</TabsTrigger>
             </TabsList>
@@ -632,13 +707,50 @@ export default function Dashboard() {
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="text-center text-muted-foreground py-8">
-                  <p>Cliquez sur le bouton ci-dessus pour accéder à la page de comparaison détaillée avec sélection de catégories.</p>
+                <CardContent className="h-[450px]">
+                  {comparisonData.chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={comparisonData.chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                        <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
+                        <Legend wrapperStyle={{ fontSize: '11px', maxHeight: '100px' }} />
+                        {comparisonData.allCategories.slice(0, 5).map((category, index) => (
+                          <Bar key={category} dataKey={category} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      Aucune donnée disponible
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
 
-            {/* Tab 3: Details */}
+            {/* Tab 3: Graphiques */}
+            <TabsContent value="graphiques" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Visualisation par Graphiques Circulaires</CardTitle>
+                      <CardDescription>Analyse détaillée des 4 catégories comptables</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setLocation("/pie-charts")}>
+                      Accéder à la page complète →
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="text-center text-muted-foreground py-8">
+                  <p>Cliquez sur le bouton ci-dessus pour accéder à la visualisation détaillée avec sélection d'année.</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab 4: Details */}
             <TabsContent value="details">
               <Card>
                 <CardHeader>
@@ -704,7 +816,7 @@ export default function Dashboard() {
               </Card>
             </TabsContent>
 
-            {/* Tab 4: Resume */}
+            {/* Tab 5: Resume */}
             <TabsContent value="resume" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <Card className="lg:col-span-2">
