@@ -76,7 +76,7 @@ export default function UploadPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-2xl space-y-8">
         <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight text-primary">HBO Analytics</h1>
+            <h1 className="text-4xl font-bold tracking-tight text-primary">Quick Analysis</h1>
             <p className="text-muted-foreground text-lg">Plateforme d'analyse financière intelligente</p>
         </div>
 
