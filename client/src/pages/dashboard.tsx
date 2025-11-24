@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Upload, Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Minus, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
+import { Upload, Download, Filter, TrendingUp, Wallet, FileText, FileSpreadsheet, Camera, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Minus, RotateCcw, ChevronDown, ChevronRight, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
@@ -741,6 +741,7 @@ export default function Dashboard() {
               <TabsTrigger value="graphiques" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Graphiques</TabsTrigger>
               <TabsTrigger value="details" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Détails</TabsTrigger>
               <TabsTrigger value="resume" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Résumé</TabsTrigger>
+              <TabsTrigger value="infos" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">Infos</TabsTrigger>
             </TabsList>
 
             {/* Tab 1: Evolution */}
@@ -1208,6 +1209,67 @@ export default function Dashboard() {
                         </Table>
                     </CardContent>
                 </Card>
+            </TabsContent>
+
+            {/* Tab 6: Infos */}
+            <TabsContent value="infos" className="space-y-6">
+              <Card className="border border-blue-200/50 bg-blue-50/30 dark:bg-blue-900/10">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Info className="h-5 w-5 text-blue-600" />
+                    À propos du stockage des données
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="border-l-4 border-red-500 pl-4 py-2 bg-red-50/30 dark:bg-red-900/10 rounded">
+                      <h3 className="font-semibold text-red-900 dark:text-red-300 mb-2">❌ Pas de persistence</h3>
+                      <ul className="space-y-2 text-sm text-red-800 dark:text-red-200">
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold">•</span>
+                          <span>Les données Excel sont stockées <strong>en mémoire</strong> (contexte React)</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold">•</span>
+                          <span>Elles <strong>disparaissent</strong> si vous rafraîchissez la page</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold">•</span>
+                          <span>Chaque import <strong>remplace les données précédentes</strong></span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="border-l-4 border-green-500 pl-4 py-2 bg-green-50/30 dark:bg-green-900/10 rounded">
+                      <h3 className="font-semibold text-green-900 dark:text-green-300 mb-2">✅ Backend configuré mais pas utilisé</h3>
+                      <ul className="space-y-2 text-sm text-green-800 dark:text-green-200">
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold">•</span>
+                          <span><strong>Express.js</strong> est configuré</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold">•</span>
+                          <span><strong>PostgreSQL + Drizzle ORM</strong> sont en place</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold">•</span>
+                          <span>Aucune API n'est implémentée pour sauvegarder les données Excel</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold">•</span>
+                          <span>Le backend existe mais n'interagit pas avec vos imports</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="p-4 bg-amber-50/50 dark:bg-amber-900/20 rounded border border-amber-200/50">
+                      <p className="text-sm text-amber-900 dark:text-amber-300">
+                        💡 <strong>Conseil :</strong> Téléchargez vos rapports avant de quitter pour ne pas perdre votre analyse !
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>
