@@ -3,14 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { useData } from "@/lib/data-context";
 import { useLocation } from "wouter";
-import { ArrowLeft, ChevronDown, ChevronRight, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { parseISO, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
-import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, CATEGORIE_LABELS } from "@/lib/mockData";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type PeriodType = "monthly" | "quarterly" | "semi-annual" | "annual";
+
+interface CategoryData {
+  name: string;
+  prefix: string[];
+  label: string;
+  color: string;
+}
 
 export default function PieChartsPage() {
   const { data } = useData();
@@ -18,33 +24,18 @@ export default function PieChartsPage() {
 
   const accounts = data?.accounts || MOCK_ACCOUNTS;
   const transactions = data?.transactions || MOCK_TRANSACTIONS;
-  
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+
   const [periodType, setPeriodType] = useState<PeriodType>("annual");
 
-  // Extract unique categories from accounts
-  const categories = useMemo(() => {
-    const categoryMap = new Map<string, { number: string; label: string; accounts: typeof accounts }>();
-    
-    accounts.forEach(acc => {
-      const categoryCode = acc.number.substring(0, 2);
-      const categoryLabel = CATEGORIE_LABELS[categoryCode] || `Catégorie ${categoryCode}`;
-      const key = `${categoryCode} - ${categoryLabel}`;
-      
-      if (!categoryMap.has(key)) {
-        categoryMap.set(key, { number: categoryCode, label: categoryLabel, accounts: [] });
-      }
-      categoryMap.get(key)!.accounts.push(acc);
-    });
+  // Define the 4 main categories
+  const categories: CategoryData[] = [
+    { name: "Actifs", prefix: ["1"], label: "Comptes 1XXXXX", color: "hsl(var(--chart-1))" },
+    { name: "Passifs", prefix: ["2"], label: "Comptes 2XXXX", color: "hsl(var(--chart-2))" },
+    { name: "Produits", prefix: ["3"], label: "Comptes 3XXXX", color: "hsl(var(--chart-3))" },
+    { name: "Charges", prefix: ["4", "5", "6", "7", "8"], label: "Comptes 4XXXX-8999X", color: "hsl(var(--chart-4))" }
+  ];
 
-    return Array.from(categoryMap.entries()).map(([key, value]) => ({
-      key,
-      ...value
-    })).sort((a, b) => a.number.localeCompare(b.number));
-  }, [accounts]);
-
-  // Get current date range based on period type
+  // Get date range based on period type
   const getDateRange = (date: Date, type: PeriodType) => {
     switch (type) {
       case "monthly":
@@ -64,70 +55,68 @@ export default function PieChartsPage() {
     }
   };
 
-  // Calculate pie chart data for selected accounts
-  const chartDataByAccount = useMemo(() => {
-    if (selectedAccounts.length === 0) return {};
-
+  // Calculate pie chart data for each category
+  const chartDataByCategory = useMemo(() => {
     const now = new Date();
     const dateRange = getDateRange(now, periodType);
 
     const result: Record<string, Array<{ name: string; value: number }>> = {};
 
-    selectedAccounts.forEach(accountId => {
-      const account = accounts.find(a => a.id === accountId);
-      if (!account) return;
+    categories.forEach((category) => {
+      // Get all accounts for this category
+      const categoryAccounts = accounts.filter(acc => {
+        const firstChar = acc.number.substring(0, 1);
+        return category.prefix.includes(firstChar);
+      });
 
-      const accountTransactions = transactions.filter(txn => {
-        if (txn.accountId !== accountId) return false;
+      const accountsMap = new Map(categoryAccounts.map(a => [a.id, a]));
+
+      // Filter transactions for this category in the date range
+      const categoryTransactions = transactions.filter(txn => {
+        if (!accountsMap.has(txn.accountId)) return false;
         const txnDate = parseISO(txn.date);
         return txnDate >= dateRange.start && txnDate <= dateRange.end;
       });
 
-      // Group by category or create segments
-      let totalDebit = 0;
-      let totalCredit = 0;
-      const movements: Record<string, number> = {};
+      // Group by account and sum debits/credits
+      const accountData: Record<string, { name: string; debit: number; credit: number }> = {};
 
-      accountTransactions.forEach(txn => {
-        totalDebit += txn.debit;
-        totalCredit += txn.credit;
+      categoryTransactions.forEach(txn => {
+        const account = accountsMap.get(txn.accountId);
+        if (!account) return;
+
+        const key = account.id;
+        if (!accountData[key]) {
+          accountData[key] = { name: `${account.number} - ${account.name}`, debit: 0, credit: 0 };
+        }
+        accountData[key].debit += txn.debit;
+        accountData[key].credit += txn.credit;
       });
 
-      // Create data for pie chart
-      if (totalDebit > 0) {
-        movements["Débits"] = totalDebit;
-      }
-      if (totalCredit > 0) {
-        movements["Crédits"] = totalCredit;
-      }
+      // Create pie chart entries
+      const pieData = Object.values(accountData)
+        .map(item => ({
+          name: item.name,
+          value: Math.abs(item.debit - item.credit)
+        }))
+        .filter(item => item.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10); // Limit to top 10 accounts
 
-      const pieData = Object.entries(movements).map(([name, value]) => ({
-        name,
-        value: Math.abs(value)
-      }));
-
-      result[accountId] = pieData.length > 0 ? pieData : [{ name: "Aucune donnée", value: 0 }];
+      result[category.name] = pieData.length > 0 ? pieData : [{ name: "Aucune donnée", value: 0 }];
     });
 
     return result;
-  }, [selectedAccounts, transactions, accounts, periodType]);
+  }, [transactions, accounts, periodType, categories]);
 
   // Colors for pie charts
-  const COLORS = [
+  const PIE_COLORS = [
     'hsl(var(--chart-1))',
     'hsl(var(--chart-2))',
     'hsl(var(--chart-3))',
     'hsl(var(--chart-4))',
     'hsl(var(--chart-5))',
   ];
-
-  const toggleAccountSelection = (accountId: string) => {
-    if (selectedAccounts.includes(accountId)) {
-      setSelectedAccounts(selectedAccounts.filter(id => id !== accountId));
-    } else {
-      setSelectedAccounts([...selectedAccounts, accountId]);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6">
@@ -139,134 +128,83 @@ export default function PieChartsPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold">Visualisation par Graphiques Circulaires</h1>
-            <p className="text-muted-foreground">Analyse détaillée des comptes sélectionnés</p>
+            <p className="text-muted-foreground">Analyse par catégories comptables</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Pie Charts - Main Content */}
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <CardTitle>Représentation par Compte</CardTitle>
-              <CardDescription>Sélectionnez une période pour afficher les graphiques</CardDescription>
-              
-              {/* Period Selection Tabs */}
-              <Tabs value={periodType} onValueChange={(value) => setPeriodType(value as PeriodType)} className="mt-4">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="monthly" data-testid="tab-monthly">Mensuel</TabsTrigger>
-                  <TabsTrigger value="quarterly" data-testid="tab-quarterly">Trimestriel</TabsTrigger>
-                  <TabsTrigger value="semi-annual" data-testid="tab-semi-annual">Semestriel</TabsTrigger>
-                  <TabsTrigger value="annual" data-testid="tab-annual">Annuel</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </CardHeader>
+        {/* Period Selection Tabs */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Sélection de Période</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={periodType} onValueChange={(value) => setPeriodType(value as PeriodType)}>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="monthly" data-testid="tab-monthly">Mensuel</TabsTrigger>
+                <TabsTrigger value="quarterly" data-testid="tab-quarterly">Trimestriel</TabsTrigger>
+                <TabsTrigger value="semi-annual" data-testid="tab-semi-annual">Semestriel</TabsTrigger>
+                <TabsTrigger value="annual" data-testid="tab-annual">Annuel</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardContent>
+        </Card>
 
-            <CardContent>
-              {selectedAccounts.length === 0 ? (
-                <div className="flex items-center justify-center h-96 text-muted-foreground">
-                  <p>Sélectionnez au moins un compte pour afficher les graphiques</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {selectedAccounts.map((accountId) => {
-                    const account = accounts.find(a => a.id === accountId);
-                    if (!account) return null;
+        {/* 4 Pie Charts Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {categories.map((category) => {
+            const pieData = chartDataByCategory[category.name] || [];
+            const hasData = pieData.some(d => d.value > 0);
+            const total = pieData.reduce((sum, item) => sum + item.value, 0);
 
-                    const pieData = chartDataByAccount[accountId] || [];
-                    const hasData = pieData.some(d => d.value > 0);
-
-                    return (
-                      <div key={accountId} className="flex flex-col items-center border rounded-lg p-4 bg-muted/20">
-                        <h3 className="font-semibold text-sm mb-2">{account.name}</h3>
-                        <p className="text-xs text-muted-foreground mb-4">{account.number}</p>
-                        
-                        {hasData ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={pieData}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                label={(entry) => `${entry.name}: ${entry.value.toLocaleString('fr-CH')}`}
-                                outerRadius={80}
-                                fill="#8884d8"
-                                dataKey="value"
-                              >
-                                {pieData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="flex items-center justify-center h-[300px] text-muted-foreground text-xs">
-                            Aucune donnée pour cette période
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Sidebar - Account Selection */}
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle className="text-lg">Sélection Comptes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="max-h-[600px] overflow-y-auto space-y-2">
-                {categories.map((category) => (
-                  <div key={category.key} className="border rounded-md p-2 space-y-2 bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setExpandedCategory(expandedCategory === category.key ? null : category.key)}
-                        className="p-1 hover:bg-muted rounded"
-                        data-testid={`button-expand-${category.number}`}
-                      >
-                        {expandedCategory === category.key ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                      </button>
-                      <label className="text-xs cursor-pointer flex-1 font-semibold">{category.label}</label>
+            return (
+              <Card key={category.name} className="flex flex-col">
+                <CardHeader>
+                  <CardTitle className="text-lg">{category.name}</CardTitle>
+                  <CardDescription>{category.label}</CardDescription>
+                  {hasData && (
+                    <div className="mt-2 text-sm font-semibold">
+                      Total: {total.toLocaleString('fr-CH', { minimumFractionDigits: 0 })}
                     </div>
-
-                    {expandedCategory === category.key && (
-                      <div className="ml-6 border-l border-muted pl-2 space-y-2">
-                        {category.accounts.map((account) => (
-                          <div key={account.id} className="flex items-center gap-2">
-                            <Checkbox
-                              checked={selectedAccounts.includes(account.id)}
-                              onCheckedChange={() => toggleAccountSelection(account.id)}
-                              data-testid={`checkbox-account-${account.id}`}
-                            />
-                            <label className="text-xs cursor-pointer">
-                              <span className="font-mono font-bold text-[10px]">{account.number}</span>{" "}
-                              <span className="text-[10px]">{account.name}</span>
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {selectedAccounts.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setSelectedAccounts([])}
-                  data-testid="button-clear-selection"
-                >
-                  Réinitialiser
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+                  )}
+                </CardHeader>
+                <CardContent className="flex-1 flex items-center justify-center">
+                  {hasData ? (
+                    <ResponsiveContainer width="100%" height={400}>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={(entry) => `${entry.name.split(' - ')[0]}: ${(entry.value / 1000).toFixed(1)}k`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} 
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '0.5rem'
+                          }}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[400px] text-muted-foreground text-sm">
+                      Aucune donnée pour cette période
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </div>
