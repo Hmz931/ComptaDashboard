@@ -147,27 +147,43 @@ export default function UploadPage() {
             </div>
         </div>
 
-        <Card className="border border-amber-200/50 bg-amber-50/30 dark:bg-amber-900/10">
+        <Card className="border border-green-200/50 bg-green-50/30 dark:bg-green-900/10">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                    <Info className="h-5 w-5 text-amber-600" />
-                    Information sur le stockage des données
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    Votre sécurité et confidentialité
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="space-y-4 text-sm">
+                <div className="p-3 bg-green-100/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-800/30">
+                    <p className="text-green-900 dark:text-green-200 font-semibold">✅ Aucune violation de données</p>
+                    <p className="text-green-800 dark:text-green-300 mt-1 text-xs">Vos données financières sont traitées de manière entièrement sécurisée et confidentielle. Aucune transmission, stockage serveur ou partage de données n'est effectué.</p>
+                </div>
+
                 <div className="space-y-2">
-                    <p className="flex items-start gap-2">
-                        <span className="text-amber-600 font-semibold mt-0.5">•</span>
-                        <span><strong>Stockage en mémoire :</strong> Les données Excel sont chargées et stockées en mémoire (contexte React) pour accélérer l'analyse.</span>
+                    <p className="flex items-start gap-2 font-semibold text-foreground">
+                        <span className="text-green-600 mt-0.5">🔒</span>
+                        <span>Fonctionnement sécurisé</span>
                     </p>
-                    <p className="flex items-start gap-2">
-                        <span className="text-amber-600 font-semibold mt-0.5">•</span>
-                        <span><strong>Données temporaires :</strong> Les données disparaissent si vous rafraîchissez la page. Téléchargez les rapports avant de quitter.</span>
-                    </p>
-                    <p className="flex items-start gap-2">
-                        <span className="text-amber-600 font-semibold mt-0.5">•</span>
-                        <span><strong>Remplacement :</strong> Chaque fois que vous chargez un nouveau fichier, il remplace les données précédentes.</span>
-                    </p>
+                    <div className="space-y-2 ml-6">
+                        <p className="flex items-start gap-2">
+                            <span className="text-green-600 font-semibold">•</span>
+                            <span><strong>Stockage local uniquement :</strong> Les données Excel sont chargées et stockées exclusivement en mémoire (contexte React) sur votre navigateur. Aucune donnée ne quitte votre ordinateur.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                            <span className="text-green-600 font-semibold">•</span>
+                            <span><strong>Données temporaires et éphémères :</strong> Les données disparaissent complètement si vous rafraîchissez la page ou fermez votre navigateur. Aucune trace ne reste. Téléchargez vos rapports avant de quitter si vous souhaitez les conserver.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                            <span className="text-green-600 font-semibold">•</span>
+                            <span><strong>Aucun serveur impliqué :</strong> Chaque fois que vous chargez un nouveau fichier, il remplace simplement les données précédentes en mémoire. Aucune sauvegarde, base de données ou serveur n'est utilisé.</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div className="p-3 bg-blue-100/50 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/30">
+                    <p className="text-blue-900 dark:text-blue-200 font-semibold text-xs">💡 Conseil</p>
+                    <p className="text-blue-800 dark:text-blue-300 mt-1 text-xs">Téléchargez vos graphiques et rapports d'analyse avant de fermer l'application pour conserver votre travail.</p>
                 </div>
             </CardContent>
         </Card>
