@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ACCOUNTS as MOCK_ACCOUNTS, TRANSACTIONS as MOCK_TRANSACTIONS, BALANCE_SHEET as MOCK_BALANCE_SHEET, INCOME_STATEMENT as MOCK_INCOME_STATEMENT, CATEGORIES, CATEGORIE_LABELS } from "@/lib/mockData";
-import { format, parseISO, startOfYear, endOfYear } from "date-fns";
+import { format, parseISO, startOfYear, endOfYear, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,7 @@ export default function Dashboard() {
   const [selectedYearsForCharts, setSelectedYearsForCharts] = useState<number[]>([]);
   const [accountSearchTerm, setAccountSearchTerm] = useState<string>("");
   const [detailsSearchTerm, setDetailsSearchTerm] = useState<string>("");
+  const [selectedYearForPie, setSelectedYearForPie] = useState<string>("");
 
   // Extract available years from transactions
   const availableYears = useMemo(() => {
@@ -54,7 +55,10 @@ export default function Dashboard() {
     if (selectedYearsForCharts.length === 0 && availableYears.length > 0) {
       setSelectedYearsForCharts([availableYears[availableYears.length - 1]]);
     }
-  }, [availableYears]);
+    if (!selectedYearForPie && availableYears.length > 0) {
+      setSelectedYearForPie(availableYears[availableYears.length - 1].toString());
+    }
+  }, [availableYears, selectedYearForPie]);
 
   // Calculate default date range from actual data
   const defaultDateRange = useMemo(() => {
@@ -391,6 +395,67 @@ export default function Dashboard() {
 
     return { chartData, years, allCategories: allCategoriesFiltered };
   }, [transactions, accounts]);
+
+  // Pie Chart Data by Categories (Actifs, Passifs, Produits, Charges)
+  const pieChartCategories = useMemo(() => {
+    if (!selectedYearForPie) return {};
+
+    const year = parseInt(selectedYearForPie);
+    const dateRange = { 
+      start: startOfYear(new Date(year, 0, 1)), 
+      end: endOfYear(new Date(year, 0, 1))
+    };
+
+    const categoryDefs = [
+      { name: "Actifs", prefix: ["1"], label: "Comptes 1XXXXX" },
+      { name: "Passifs", prefix: ["2"], label: "Comptes 2XXXX" },
+      { name: "Produits", prefix: ["3"], label: "Comptes 3XXXX" },
+      { name: "Charges", prefix: ["4", "5", "6", "7", "8"], label: "Comptes 4XXXX-8999X" }
+    ];
+
+    const result: Record<string, Array<{ name: string; value: number }>> = {};
+
+    categoryDefs.forEach((category) => {
+      const categoryAccounts = accounts.filter(acc => {
+        const firstChar = acc.number.substring(0, 1);
+        return category.prefix.includes(firstChar);
+      });
+
+      const accountsMap = new Map(categoryAccounts.map(a => [a.id, a]));
+
+      const categoryTransactions = transactions.filter(txn => {
+        if (!accountsMap.has(txn.accountId)) return false;
+        const txnDate = parseISO(txn.date);
+        return txnDate >= dateRange.start && txnDate <= dateRange.end;
+      });
+
+      const accountData: Record<string, { name: string; debit: number; credit: number }> = {};
+
+      categoryTransactions.forEach(txn => {
+        const account = accountsMap.get(txn.accountId);
+        if (!account) return;
+
+        const key = account.id;
+        if (!accountData[key]) {
+          accountData[key] = { name: `${account.number} - ${account.name}`, debit: 0, credit: 0 };
+        }
+        accountData[key].debit += txn.debit;
+        accountData[key].credit += txn.credit;
+      });
+
+      const pieData = Object.values(accountData)
+        .map(item => ({
+          name: item.name,
+          value: Math.abs(item.debit - item.credit)
+        }))
+        .filter(item => item.value > 0)
+        .sort((a, b) => b.value - a.value);
+
+      result[category.name] = pieData.length > 0 ? pieData : [];
+    });
+
+    return result;
+  }, [transactions, accounts, selectedYearForPie]);
 
   const netResult = incomeStatement.reduce((acc, item) => acc + item.amount, 0);
   const isAggregatedView = selectedAccounts.length === 0 && selectedCategory !== "Tous les comptes";
@@ -732,22 +797,109 @@ export default function Dashboard() {
 
             {/* Tab 3: Graphiques */}
             <TabsContent value="graphiques" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Visualisation par Graphiques Circulaires</CardTitle>
-                      <CardDescription>Analyse détaillée des 4 catégories comptables</CardDescription>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setLocation("/pie-charts")}>
-                      Accéder à la page complète →
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="text-center text-muted-foreground py-8">
-                  <p>Cliquez sur le bouton ci-dessus pour accéder à la visualisation détaillée avec sélection d'année.</p>
-                </CardContent>
-              </Card>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Graphiques Circulaires</h3>
+                  <p className="text-sm text-muted-foreground">Analyse des 4 catégories comptables</p>
+                </div>
+                <Select value={selectedYearForPie} onValueChange={setSelectedYearForPie}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Année" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {["Actifs", "Passifs", "Produits", "Charges"].map((categoryName) => {
+                  const categoryLabels: Record<string, string> = {
+                    "Actifs": "Comptes 1XXXXX",
+                    "Passifs": "Comptes 2XXXX",
+                    "Produits": "Comptes 3XXXX",
+                    "Charges": "Comptes 4XXXX-8999X"
+                  };
+                  const pieData = pieChartCategories[categoryName] || [];
+                  const hasData = pieData.length > 0;
+                  const total = pieData.reduce((sum, item) => sum + item.value, 0);
+
+                  return (
+                    <Card key={categoryName} className="flex flex-col">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">{categoryName}</CardTitle>
+                        <CardDescription className="text-xs">{categoryLabels[categoryName]}</CardDescription>
+                        {hasData && (
+                          <div className="mt-2 text-xs font-semibold">
+                            Total: {total.toLocaleString('fr-CH', { minimumFractionDigits: 0 })}
+                          </div>
+                        )}
+                      </CardHeader>
+                      <CardContent className="flex-1 flex gap-3">
+                        {hasData ? (
+                          <>
+                            <div className="flex-1 flex items-center justify-center min-h-[250px]">
+                              <ResponsiveContainer width="100%" height={250}>
+                                <PieChart>
+                                  <Pie
+                                    data={pieData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={40}
+                                    outerRadius={70}
+                                    paddingAngle={1}
+                                    dataKey="value"
+                                  >
+                                    {pieData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                  </Pie>
+                                  <Tooltip 
+                                    formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} 
+                                    contentStyle={{
+                                      backgroundColor: 'hsl(var(--background))',
+                                      border: '1px solid hsl(var(--border))',
+                                      borderRadius: '0.5rem',
+                                      fontSize: '11px'
+                                    }}
+                                  />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+
+                            <div className="w-40 flex flex-col gap-1 max-h-[250px] overflow-y-auto pr-2">
+                              {pieData.map((item, index) => (
+                                <div key={item.name} className="text-[11px] p-1.5 rounded-md bg-muted/50 border border-border flex-shrink-0">
+                                  <div className="flex items-start gap-1.5">
+                                    <div 
+                                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5"
+                                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-semibold text-foreground truncate">{item.name.split(" - ")[0]}</div>
+                                      <div className="text-muted-foreground font-mono text-[10px]">
+                                        {(item.value / 1000).toFixed(1)}k
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-[250px] text-muted-foreground text-xs">
+                            Aucune donnée
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </TabsContent>
 
             {/* Tab 4: Details */}
