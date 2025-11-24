@@ -9,6 +9,7 @@ import UploadPage from "@/pages/upload";
 import RatiosDocumentation from "@/pages/ratios-documentation";
 import PlanComptablePage from "@/pages/plan-comptable";
 import ComparisonPage from "@/pages/comparison";
+import PieChartsPage from "@/pages/pie-charts";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/ratios" component={RatiosDocumentation} />
       <Route path="/plan-comptable" component={PlanComptablePage} />
       <Route path="/comparison" component={ComparisonPage} />
+      <Route path="/pie-charts" component={PieChartsPage} />
       <Route component={NotFound} />
     </Switch>
   );
