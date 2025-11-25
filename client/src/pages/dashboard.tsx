@@ -528,10 +528,10 @@ export default function Dashboard() {
     const periodsSet = new Set<string>();
     const accountsMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
     
-    // Get liquidity accounts (typically 5xxx)
+    // Get liquidity accounts (Actifs 1xxx, Passifs 2xxx)
     const liquidityAccounts = selectedLiquidityAccounts.length > 0 
       ? accounts.filter(a => selectedLiquidityAccounts.includes(a.id))
-      : accounts.filter(a => a.number.startsWith('5'));
+      : accounts.filter(a => a.number.startsWith('1') || a.number.startsWith('2'));
     
     const liquidityAccountIds = new Set(liquidityAccounts.map(a => a.id));
 
