@@ -532,11 +532,8 @@ export default function Dashboard() {
   const liquidityTrackingData = useMemo(() => {
     const periodsSet = new Set<string>();
     
-    // Get accounts to trace: use selected accounts if any, otherwise use all liquidity accounts
-    const accountsToTrace = selectedLiquidityAccounts.length > 0 
-      ? accounts.filter(a => selectedLiquidityAccounts.includes(a.id))
-      : allLiquidityAccounts;
-    
+    // Only trace accounts that are explicitly selected
+    const accountsToTrace = accounts.filter(a => selectedLiquidityAccounts.includes(a.id));
     const accountsToTraceIds = new Set(accountsToTrace.map(a => a.id));
 
     transactions.forEach(txn => {
@@ -1194,7 +1191,7 @@ export default function Dashboard() {
                       {allLiquidityAccounts.map((acc) => (
                         <div key={acc.id} className="flex items-center gap-2 p-2 rounded-md border border-border hover:bg-muted/50">
                           <Checkbox
-                            checked={selectedLiquidityAccounts.length === 0 || selectedLiquidityAccounts.includes(acc.id)}
+                            checked={selectedLiquidityAccounts.includes(acc.id)}
                             onCheckedChange={(checked) => {
                               if (checked) {
                                 setSelectedLiquidityAccounts([...selectedLiquidityAccounts, acc.id]);
