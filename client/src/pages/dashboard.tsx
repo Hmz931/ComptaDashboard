@@ -1121,8 +1121,8 @@ export default function Dashboard() {
                                     data={pieData}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={40}
-                                    outerRadius={70}
+                                    innerRadius={50}
+                                    outerRadius={85}
                                     paddingAngle={1}
                                     dataKey="value"
                                   >
@@ -1144,22 +1144,28 @@ export default function Dashboard() {
                             </div>
 
                             <div className="w-40 flex flex-col gap-1 max-h-[250px] overflow-y-auto pr-2">
-                              {pieData.map((item, index) => (
-                                <div key={item.name} className="text-[11px] p-1.5 rounded-md bg-muted/50 border border-border flex-shrink-0">
-                                  <div className="flex items-start gap-1.5">
-                                    <div 
-                                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5"
-                                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-semibold text-foreground truncate">{item.name.split(" - ")[0]}</div>
-                                      <div className="text-muted-foreground font-mono text-[10px]">
-                                        {(item.value / 1000).toFixed(1)}k
+                              {pieData.map((item, index) => {
+                                const percentage = ((item.value / total) * 100).toFixed(1);
+                                return (
+                                  <div key={item.name} className="text-[11px] p-1.5 rounded-md bg-muted/50 border border-border flex-shrink-0">
+                                    <div className="flex items-start gap-1.5">
+                                      <div 
+                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5"
+                                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-foreground truncate">{item.name.split(" - ")[0]}</div>
+                                        <div className="text-muted-foreground font-mono text-[10px]">
+                                          {(item.value / 1000).toFixed(1)}k
+                                        </div>
+                                        <div className="text-muted-foreground text-[9px] font-medium">
+                                          {percentage}%
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </>
                         ) : (
