@@ -605,16 +605,15 @@ export default function Dashboard() {
     if (!selectedYearForPie) return {};
 
     const year = parseInt(selectedYearForPie);
-    const dateRange = { 
-      start: startOfYear(new Date(year, 0, 1)), 
-      end: endOfYear(new Date(year, 0, 1))
-    };
+    const yearStart = startOfYear(new Date(year, 0, 1));
+    const yearEnd = endOfYear(new Date(year, 0, 1));
+    const previousYearEnd = new Date(year - 1, 11, 31);
 
     const categoryDefs = [
-      { name: "Actifs", prefix: ["1"], label: "Classe 1" },
-      { name: "Passifs", prefix: ["2"], label: "Classe 2" },
-      { name: "Produits", prefix: ["3"], label: "Classe 3" },
-      { name: "Charges", prefix: ["4", "5", "6", "7", "8"], label: "Classe 4-8" }
+      { name: "Actifs", prefix: ["1"], label: "Classe 1", isBalance: true },
+      { name: "Passifs", prefix: ["2"], label: "Classe 2", isBalance: true },
+      { name: "Produits", prefix: ["3"], label: "Classe 3", isBalance: false },
+      { name: "Charges", prefix: ["4", "5", "6", "7", "8"], label: "Classe 4-8", isBalance: false }
     ];
 
     const result: Record<string, Array<{ name: string; value: number }>> = {};
@@ -626,16 +625,37 @@ export default function Dashboard() {
       });
 
       const accountsMap = new Map(categoryAccounts.map(a => [a.id, a]));
-
-      const categoryTransactions = transactions.filter(txn => {
-        if (!accountsMap.has(txn.accountId)) return false;
-        const txnDate = parseISO(txn.date);
-        return txnDate >= dateRange.start && txnDate <= dateRange.end;
-      });
-
       const accountData: Record<string, { name: string; debit: number; credit: number }> = {};
 
-      categoryTransactions.forEach(txn => {
+      // For balance sheet accounts (Actifs, Passifs): include previous years
+      if (category.isBalance) {
+        const previousYearsTransactions = transactions.filter(txn => {
+          if (!accountsMap.has(txn.accountId)) return false;
+          const txnDate = parseISO(txn.date);
+          return txnDate <= previousYearEnd;
+        });
+
+        previousYearsTransactions.forEach(txn => {
+          const account = accountsMap.get(txn.accountId);
+          if (!account) return;
+
+          const key = account.id;
+          if (!accountData[key]) {
+            accountData[key] = { name: `${account.number} - ${account.name}`, debit: 0, credit: 0 };
+          }
+          accountData[key].debit += txn.debit;
+          accountData[key].credit += txn.credit;
+        });
+      }
+
+      // Add current year transactions
+      const yearTransactions = transactions.filter(txn => {
+        if (!accountsMap.has(txn.accountId)) return false;
+        const txnDate = parseISO(txn.date);
+        return txnDate >= yearStart && txnDate <= yearEnd;
+      });
+
+      yearTransactions.forEach(txn => {
         const account = accountsMap.get(txn.accountId);
         if (!account) return;
 
