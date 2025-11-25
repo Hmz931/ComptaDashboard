@@ -557,6 +557,8 @@ export default function Dashboard() {
 
       transactions.forEach(txn => {
         if (!accountsToTraceIds.has(txn.accountId)) return;
+        // Exclude transactions with "Report" in description (opening balances)
+        if (txn.description.toLowerCase().includes("report")) return;
         const date = new Date(parseISO(txn.date));
         const p = getPeriodLabel(date, selectedPeriodComparison);
         if (p === period) {
