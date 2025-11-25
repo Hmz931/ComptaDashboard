@@ -172,10 +172,16 @@ export default function Dashboard() {
     const accountBalances: Record<string, number> = {};
 
     for (const txn of txns) {
-        const movement = txn.debit - txn.credit;
-        accountBalances[txn.accountId] = (accountBalances[txn.accountId] || 0) + movement;
-        
         const account = accounts.find(a => a.id === txn.accountId);
+        const isProductAccount = account?.number.startsWith('3');
+        
+        // For product accounts (3xxxx): Credit = increase, Debit = decrease
+        // For other accounts: Debit = increase, Credit = decrease
+        const movement = isProductAccount 
+            ? txn.credit - txn.debit  
+            : txn.debit - txn.credit;
+        
+        accountBalances[txn.accountId] = (accountBalances[txn.accountId] || 0) + movement;
         
         txnsWithBalance.push({
             ...txn,
@@ -198,10 +204,6 @@ export default function Dashboard() {
     if (isAggregated) {
         // Aggregate by Date
         const dateMap: Record<string, { date: string, timestamp: number, balance: number }> = {};
-        let runningBalance = 0;
-        
-        // We need to process all transactions in order to get a correct running sum for the category
-        // filteredData is already sorted by date
         
         // Group by date first
         const dailyMovements: Record<string, number> = {};
@@ -211,15 +213,12 @@ export default function Dashboard() {
         });
 
         // Create cumulative trend
-        // Note: This is simplified. Ideally we need all dates in range.
         const dates = Object.keys(dailyMovements).sort((a, b) => {
              return parse(a, "dd.MM.yyyy", new Date()).getTime() - parse(b, "dd.MM.yyyy", new Date()).getTime();
         });
         
         const result = [];
         let cumulative = 0;
-        
-        // Add initial point?
         
         for (const d of dates) {
             cumulative += dailyMovements[d];
@@ -232,14 +231,41 @@ export default function Dashboard() {
         }
         return result;
     } else {
-        // Individual Lines
-        return filteredData.map(t => ({
-            date: format(parseISO(t.date), "dd.MM.yyyy"),
-            timestamp: new Date(t.date).getTime(),
-            balance: t.cumulativeBalance,
-            account: `${t.accountNumber} - ${t.accountName}`,
-            [t.accountNumber!]: t.cumulativeBalance
-        }));
+        // Individual Lines - Group by account and date to get unique points per account per day
+        const accountDateMap: Record<string, Record<string, number>> = {};
+        
+        filteredData.forEach(t => {
+            const d = format(parseISO(t.date), "dd.MM.yyyy");
+            const accKey = t.accountNumber!;
+            
+            if (!accountDateMap[accKey]) {
+                accountDateMap[accKey] = {};
+            }
+            // Keep the last value for each account on each day
+            accountDateMap[accKey][d] = t.cumulativeBalance;
+        });
+
+        // Get all unique dates
+        const allDates = Array.from(new Set(filteredData.map(t => format(parseISO(t.date), "dd.MM.yyyy"))))
+            .sort((a, b) => parse(a, "dd.MM.yyyy", new Date()).getTime() - parse(b, "dd.MM.yyyy", new Date()).getTime());
+
+        // Create chart data
+        const result = allDates.map(d => {
+            const row: Record<string, any> = {
+                date: d,
+                timestamp: parse(d, "dd.MM.yyyy", new Date()).getTime()
+            };
+            
+            Object.entries(accountDateMap).forEach(([accNum, dateValues]) => {
+                if (dateValues[d] !== undefined) {
+                    row[accNum] = dateValues[d];
+                }
+            });
+            
+            return row;
+        });
+
+        return result;
     }
   }, [filteredData, selectedAccounts, selectedCategory]);
 
