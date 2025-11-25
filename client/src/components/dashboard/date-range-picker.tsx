@@ -1,8 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { CalendarIcon, X } from "lucide-react"
-import { addDays, format } from "date-fns"
+import { CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
 import { DateRange } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
@@ -40,53 +40,27 @@ export function CalendarDateRangePicker({
     }
   };
 
-  const handleReset = () => {
-    setDate(undefined);
-  };
-
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* Date range summary */}
-      {date?.from && date?.to && (
-        <div className="p-3 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Plage sélectionnée</p>
-              <p className="text-sm font-bold text-foreground">
-                {format(date.from, "dd MMM yyyy")} → {format(date.to, "dd MMM yyyy")}
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
+    <div className={cn("space-y-3", className)}>
       {/* Input fields */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date de début</label>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Date début</label>
           <Input
             type="date"
             value={date?.from ? format(date.from, "yyyy-MM-dd") : ""}
             onChange={handleFromChange}
-            className="h-9 text-sm font-medium"
+            className="h-8 text-xs"
             data-testid="input-date-from"
           />
         </div>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date de fin</label>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Date fin</label>
           <Input
             type="date"
             value={date?.to ? format(date.to, "yyyy-MM-dd") : ""}
             onChange={handleToChange}
-            className="h-9 text-sm font-medium"
+            className="h-8 text-xs"
             data-testid="input-date-to"
           />
         </div>
@@ -97,22 +71,15 @@ export function CalendarDateRangePicker({
         <PopoverTrigger asChild>
           <Button
             id="date"
-            variant={date?.from && date?.to ? "default" : "outline"}
+            variant="outline"
             size="sm"
-            className={cn(
-              "w-full justify-start text-left font-medium gap-2 h-9",
-              !date && "text-muted-foreground"
-            )}
+            className="w-full justify-start text-left font-normal"
           >
-            <CalendarIcon className="h-4 w-4 flex-shrink-0" />
-            {date?.from ? (
-              date.to ? (
-                <span>{format(date.from, "dd.MM.yy")} - {format(date.to, "dd.MM.yy")}</span>
-              ) : (
-                <span>{format(date.from, "dd.MM.yy")}</span>
-              )
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {date?.from && date?.to ? (
+              <span>{format(date.from, "dd.MM.yyyy")} - {format(date.to, "dd.MM.yyyy")}</span>
             ) : (
-              <span>Choisir une période...</span>
+              <span className="text-muted-foreground">Choisir une période...</span>
             )}
           </Button>
         </PopoverTrigger>
