@@ -70,30 +70,6 @@ export default function Dashboard() {
     }
   }, [availableYears, selectedYearForPie, selectedYearForResume]);
 
-  // Initialize default selections for liquidity accounts (10xx by default)
-  useEffect(() => {
-    if (selectedLiquidityAccounts.length === 0 && allLiquidityAccounts.length > 0) {
-      const default10xxAccounts = allLiquidityAccounts
-        .filter(acc => acc.number.startsWith('10'))
-        .map(acc => acc.id);
-      if (default10xxAccounts.length > 0) {
-        setSelectedLiquidityAccounts(default10xxAccounts);
-      }
-    }
-  }, [allLiquidityAccounts]);
-
-  // Initialize default selections for comparison categories (10xx by default)
-  useEffect(() => {
-    if (selectedCategoriesComparison.length === 0 && comparisonDataFull.allCategories.length > 0) {
-      const default10xxCategories = comparisonDataFull.allCategories
-        .filter(category => category.substring(0, 2) === "10")
-        .map(category => category);
-      if (default10xxCategories.length > 0) {
-        setSelectedCategoriesComparison(default10xxCategories);
-      }
-    }
-  }, [comparisonDataFull.allCategories]);
-
   // Calculate default date range from actual data
   const defaultDateRange = useMemo(() => {
     if (transactions.length === 0) {
@@ -534,6 +510,17 @@ export default function Dashboard() {
     return { chartData, periods, allCategories: allCategoriesFiltered, subAccountsByCategory };
   }, [transactions, accounts, selectedPeriodComparison]);
 
+  // Initialize default selections for comparison categories (10xx by default)
+  useEffect(() => {
+    if (selectedCategoriesComparison.length === 0 && comparisonDataFull.allCategories.length > 0) {
+      const default10xxCategories = comparisonDataFull.allCategories
+        .filter(category => category.substring(0, 2) === "10");
+      if (default10xxCategories.length > 0) {
+        setSelectedCategoriesComparison(default10xxCategories);
+      }
+    }
+  }, [comparisonDataFull.allCategories, selectedCategoriesComparison]);
+
   // Display categories for comparison chart
   const displayCategoriesComparison = useMemo(() => {
     if (selectedSubAccountsComparison.length > 0) {
@@ -551,6 +538,18 @@ export default function Dashboard() {
   const allLiquidityAccounts = useMemo(() => {
     return accounts.filter(a => a.number.startsWith('1') || a.number.startsWith('2'));
   }, [accounts]);
+
+  // Initialize default selections for liquidity accounts (10xx by default)
+  useEffect(() => {
+    if (selectedLiquidityAccounts.length === 0 && allLiquidityAccounts.length > 0) {
+      const default10xxAccounts = allLiquidityAccounts
+        .filter(acc => acc.number.startsWith('10'))
+        .map(acc => acc.id);
+      if (default10xxAccounts.length > 0) {
+        setSelectedLiquidityAccounts(default10xxAccounts);
+      }
+    }
+  }, [allLiquidityAccounts, selectedLiquidityAccounts]);
 
   // Liquidity tracking data (Débits green, Crédits red)
   const liquidityTrackingData = useMemo(() => {
