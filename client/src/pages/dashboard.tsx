@@ -48,6 +48,8 @@ export default function Dashboard() {
   const [selectedSubAccountsComparison, setSelectedSubAccountsComparison] = useState<string[]>([]);
   const [selectedYearForResume, setSelectedYearForResume] = useState<string>("");
   const [selectedPeriodComparison, setSelectedPeriodComparison] = useState<"Annuel" | "Semestriel" | "Trimestriel" | "Mensuel">("Annuel");
+  const [comparisonMode, setComparisonMode] = useState<"general" | "liquidity">("general");
+  const [selectedLiquidityAccounts, setSelectedLiquidityAccounts] = useState<string[]>([]);
 
   // Extract available years from transactions
   const availableYears = useMemo(() => {
@@ -521,6 +523,57 @@ export default function Dashboard() {
     return selectedCategoriesComparison.length > 0 ? selectedCategoriesComparison : comparisonDataFull.allCategories;
   }, [selectedSubAccountsComparison, selectedCategoriesComparison, comparisonDataFull.allCategories, accounts]);
 
+  // Liquidity tracking data (Débits green, Crédits red)
+  const liquidityTrackingData = useMemo(() => {
+    const periodsSet = new Set<string>();
+    const accountsMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
+    
+    // Get liquidity accounts (typically 5xxx)
+    const liquidityAccounts = selectedLiquidityAccounts.length > 0 
+      ? accounts.filter(a => selectedLiquidityAccounts.includes(a.id))
+      : accounts.filter(a => a.number.startsWith('5'));
+    
+    const liquidityAccountIds = new Set(liquidityAccounts.map(a => a.id));
+
+    transactions.forEach(txn => {
+      if (!liquidityAccountIds.has(txn.accountId)) return;
+      const date = new Date(parseISO(txn.date));
+      const periodLabel = getPeriodLabel(date, selectedPeriodComparison);
+      periodsSet.add(periodLabel);
+    });
+
+    const periods = Array.from(periodsSet).sort((a, b) => {
+      if (selectedPeriodComparison === "Annuel") {
+        return parseInt(a) - parseInt(b);
+      } else {
+        return a.localeCompare(b);
+      }
+    });
+
+    const chartData = periods.map(period => {
+      let debits = 0;
+      let credits = 0;
+
+      transactions.forEach(txn => {
+        if (!liquidityAccountIds.has(txn.accountId)) return;
+        const date = new Date(parseISO(txn.date));
+        const p = getPeriodLabel(date, selectedPeriodComparison);
+        if (p === period) {
+          debits += txn.debit;
+          credits += txn.credit;
+        }
+      });
+
+      return {
+        period,
+        "Encaissements": debits,
+        "Décaissements": credits
+      };
+    });
+
+    return { chartData, periods, liquidityAccounts };
+  }, [transactions, accounts, selectedLiquidityAccounts, selectedPeriodComparison]);
+
   // Pie Chart Data by Categories (Actifs, Passifs, Produits, Charges)
   const pieChartCategories = useMemo(() => {
     if (!selectedYearForPie) return {};
@@ -949,6 +1002,25 @@ export default function Dashboard() {
 
             {/* Tab 2: Comparison */}
             <TabsContent value="comparison" className="space-y-6">
+              {/* Mode Selection */}
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant={comparisonMode === "general" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setComparisonMode("general")}
+                >
+                  Comparaison générale
+                </Button>
+                <Button 
+                  variant={comparisonMode === "liquidity" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setComparisonMode("liquidity")}
+                >
+                  Suivi des Encaissements/Décaissements
+                </Button>
+              </div>
+
+              {comparisonMode === "general" ? (
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                 <Card className="lg:col-span-3">
                   <CardHeader>
@@ -1065,6 +1137,88 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
               </div>
+              ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <Card className="lg:col-span-3">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Suivi des Encaissements et Décaissements</CardTitle>
+                        <CardDescription>Visualisation des mouvements de trésorerie par période</CardDescription>
+                      </div>
+                      <Select value={selectedPeriodComparison} onValueChange={(value) => setSelectedPeriodComparison(value as "Annuel" | "Semestriel" | "Trimestriel" | "Mensuel")}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Sélectionner période" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Mensuel">Mensuel</SelectItem>
+                          <SelectItem value="Trimestriel">Trimestriel</SelectItem>
+                          <SelectItem value="Semestriel">Semestriel</SelectItem>
+                          <SelectItem value="Annuel">Annuel</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-[400px]">
+                    {liquidityTrackingData.chartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={liquidityTrackingData.chartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                          <XAxis dataKey="period" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                          <Tooltip formatter={(value: number) => value.toLocaleString('fr-CH', { minimumFractionDigits: 0 })} />
+                          <Legend wrapperStyle={{ fontSize: '11px' }} />
+                          <Bar dataKey="Encaissements" fill="#10b981" />
+                          <Bar dataKey="Décaissements" fill="#ef4444" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Aucune donnée disponible
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Sélection Liquidité</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-xs text-muted-foreground">Sélectionnez les comptes à suivre:</p>
+                    <div className="max-h-[400px] overflow-y-auto space-y-2">
+                      {liquidityTrackingData.liquidityAccounts.map((acc) => (
+                        <div key={acc.id} className="flex items-center gap-2 p-2 rounded-md border border-border hover:bg-muted/50">
+                          <Checkbox
+                            checked={selectedLiquidityAccounts.includes(acc.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedLiquidityAccounts([...selectedLiquidityAccounts, acc.id]);
+                              } else {
+                                setSelectedLiquidityAccounts(selectedLiquidityAccounts.filter(id => id !== acc.id));
+                              }
+                            }}
+                          />
+                          <label className="text-xs cursor-pointer flex-1">
+                            <span className="font-mono font-bold text-[10px]">{acc.number}</span> <span className="text-[10px]">{acc.name}</span>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    {selectedLiquidityAccounts.length > 0 && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => setSelectedLiquidityAccounts([])}
+                      >
+                        Réinitialiser
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+              )}
             </TabsContent>
 
             {/* Tab 3: Graphiques */}
