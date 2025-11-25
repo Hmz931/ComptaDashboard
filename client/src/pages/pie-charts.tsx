@@ -178,8 +178,8 @@ export default function PieChartsPage() {
                               data={pieData}
                               cx="50%"
                               cy="50%"
-                              innerRadius={60}
-                              outerRadius={100}
+                              innerRadius={75}
+                              outerRadius={120}
                               paddingAngle={2}
                               dataKey="value"
                             >
@@ -202,22 +202,28 @@ export default function PieChartsPage() {
 
                       {/* Legend List */}
                       <div className="w-56 flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-2">
-                        {pieData.map((item, index) => (
-                          <div key={item.account} className="text-xs p-2 rounded-md bg-muted/50 border border-border flex-shrink-0">
-                            <div className="flex items-start gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
-                                style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-foreground truncate">{item.account}</div>
-                                <div className="text-muted-foreground font-mono">
-                                  {item.value.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}
+                        {pieData.map((item, index) => {
+                          const percentage = ((item.value / total) * 100).toFixed(1);
+                          return (
+                            <div key={item.account} className="text-xs p-2 rounded-md bg-muted/50 border border-border flex-shrink-0">
+                              <div className="flex items-start gap-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
+                                  style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-foreground truncate">{item.account}</div>
+                                  <div className="text-muted-foreground font-mono">
+                                    {item.value.toLocaleString('fr-CH', { minimumFractionDigits: 2 })}
+                                  </div>
+                                  <div className="text-muted-foreground text-[10px] font-medium">
+                                    {percentage}%
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   ) : (
