@@ -70,6 +70,30 @@ export default function Dashboard() {
     }
   }, [availableYears, selectedYearForPie, selectedYearForResume]);
 
+  // Initialize default selections for liquidity accounts (10xx by default)
+  useEffect(() => {
+    if (selectedLiquidityAccounts.length === 0 && allLiquidityAccounts.length > 0) {
+      const default10xxAccounts = allLiquidityAccounts
+        .filter(acc => acc.number.startsWith('10'))
+        .map(acc => acc.id);
+      if (default10xxAccounts.length > 0) {
+        setSelectedLiquidityAccounts(default10xxAccounts);
+      }
+    }
+  }, [allLiquidityAccounts]);
+
+  // Initialize default selections for comparison categories (10xx by default)
+  useEffect(() => {
+    if (selectedCategoriesComparison.length === 0 && comparisonDataFull.allCategories.length > 0) {
+      const default10xxCategories = comparisonDataFull.allCategories
+        .filter(category => category.substring(0, 2) === "10")
+        .map(category => category);
+      if (default10xxCategories.length > 0) {
+        setSelectedCategoriesComparison(default10xxCategories);
+      }
+    }
+  }, [comparisonDataFull.allCategories]);
+
   // Calculate default date range from actual data
   const defaultDateRange = useMemo(() => {
     if (transactions.length === 0) {
@@ -588,10 +612,10 @@ export default function Dashboard() {
     };
 
     const categoryDefs = [
-      { name: "Actifs", prefix: ["1"], label: "Comptes 1XXXXX" },
-      { name: "Passifs", prefix: ["2"], label: "Comptes 2XXXX" },
-      { name: "Produits", prefix: ["3"], label: "Comptes 3XXXX" },
-      { name: "Charges", prefix: ["4", "5", "6", "7", "8"], label: "Comptes 4XXXX-8999X" }
+      { name: "Actifs", prefix: ["1"], label: "Classe 1" },
+      { name: "Passifs", prefix: ["2"], label: "Classe 2" },
+      { name: "Produits", prefix: ["3"], label: "Classe 3" },
+      { name: "Charges", prefix: ["4", "5", "6", "7", "8"], label: "Classe 4-8" }
     ];
 
     const result: Record<string, Array<{ name: string; value: number }>> = {};
@@ -1248,10 +1272,10 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {["Actifs", "Passifs", "Produits", "Charges"].map((categoryName) => {
                   const categoryLabels: Record<string, string> = {
-                    "Actifs": "Comptes 1XXXXX",
-                    "Passifs": "Comptes 2XXXX",
-                    "Produits": "Comptes 3XXXX",
-                    "Charges": "Comptes 4XXXX-8999X"
+                    "Actifs": "Classe 1",
+                    "Passifs": "Classe 2",
+                    "Produits": "Classe 3",
+                    "Charges": "Classe 4-8"
                   };
                   const pieData = pieChartCategories[categoryName] || [];
                   const hasData = pieData.length > 0;
