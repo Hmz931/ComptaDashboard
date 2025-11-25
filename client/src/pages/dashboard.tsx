@@ -510,7 +510,7 @@ export default function Dashboard() {
     return { chartData, periods, allCategories: allCategoriesFiltered, subAccountsByCategory };
   }, [transactions, accounts, selectedPeriodComparison]);
 
-  // Initialize default selections for comparison categories (10xx by default)
+  // Initialize default selections for comparison categories (10xx by default) - only on first mount
   useEffect(() => {
     if (selectedCategoriesComparison.length === 0 && comparisonDataFull.allCategories.length > 0) {
       const default10xxCategories = comparisonDataFull.allCategories
@@ -519,7 +519,7 @@ export default function Dashboard() {
         setSelectedCategoriesComparison(default10xxCategories);
       }
     }
-  }, [comparisonDataFull.allCategories, selectedCategoriesComparison]);
+  }, []); // Empty dependency array - only runs once on mount
 
   // Display categories for comparison chart
   const displayCategoriesComparison = useMemo(() => {
@@ -539,7 +539,7 @@ export default function Dashboard() {
     return accounts.filter(a => a.number.startsWith('1') || a.number.startsWith('2'));
   }, [accounts]);
 
-  // Initialize default selections for liquidity accounts (10xx by default)
+  // Initialize default selections for liquidity accounts (10xx by default) - only on first mount
   useEffect(() => {
     if (selectedLiquidityAccounts.length === 0 && allLiquidityAccounts.length > 0) {
       const default10xxAccounts = allLiquidityAccounts
@@ -549,7 +549,7 @@ export default function Dashboard() {
         setSelectedLiquidityAccounts(default10xxAccounts);
       }
     }
-  }, [allLiquidityAccounts, selectedLiquidityAccounts]);
+  }, []); // Empty dependency array - only runs once on mount
 
   // Liquidity tracking data (Débits green, Crédits red)
   const liquidityTrackingData = useMemo(() => {
