@@ -670,6 +670,7 @@ export default function Dashboard() {
     const year = parseInt(selectedYearForResume);
     const yearStart = startOfYear(new Date(year, 0, 1));
     const yearEnd = endOfYear(new Date(year, 0, 1));
+    const previousYearEnd = new Date(year - 1, 11, 31);
 
     const accountsMap = new Map(accounts.map(a => [a.id, a]));
     
@@ -679,9 +680,27 @@ export default function Dashboard() {
       return txnDate >= yearStart && txnDate <= yearEnd;
     });
 
+    // Filter transactions for all previous years (for opening balance)
+    const previousYearsTransactions = transactions.filter(txn => {
+      const txnDate = parseISO(txn.date);
+      return txnDate <= previousYearEnd;
+    });
+
     // Calculate Balance Sheet (cumulative for asset/liability accounts)
     const bsData: Record<string, { name: string; amount: number; number: string }> = {};
     
+    // First, calculate opening balance from all previous years
+    previousYearsTransactions.forEach(txn => {
+      const account = accountsMap.get(txn.accountId);
+      if (!account || (!account.number.startsWith('1') && !account.number.startsWith('2'))) return;
+      
+      if (!bsData[account.id]) {
+        bsData[account.id] = { name: account.name, number: account.number, amount: 0 };
+      }
+      bsData[account.id].amount += txn.debit - txn.credit;
+    });
+
+    // Then add movements from the selected year
     yearTransactions.forEach(txn => {
       const account = accountsMap.get(txn.accountId);
       if (!account || (!account.number.startsWith('1') && !account.number.startsWith('2'))) return;
