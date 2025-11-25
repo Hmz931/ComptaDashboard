@@ -523,20 +523,24 @@ export default function Dashboard() {
     return selectedCategoriesComparison.length > 0 ? selectedCategoriesComparison : comparisonDataFull.allCategories;
   }, [selectedSubAccountsComparison, selectedCategoriesComparison, comparisonDataFull.allCategories, accounts]);
 
+  // All available liquidity accounts (1xxx, 2xxx) for the selector
+  const allLiquidityAccounts = useMemo(() => {
+    return accounts.filter(a => a.number.startsWith('1') || a.number.startsWith('2'));
+  }, [accounts]);
+
   // Liquidity tracking data (Débits green, Crédits red)
   const liquidityTrackingData = useMemo(() => {
     const periodsSet = new Set<string>();
-    const accountsMap = new Map(accounts.map(a => [a.id, { number: a.number, name: a.name }]));
     
-    // Get liquidity accounts (Actifs 1xxx, Passifs 2xxx)
-    const liquidityAccounts = selectedLiquidityAccounts.length > 0 
+    // Get accounts to trace: use selected accounts if any, otherwise use all liquidity accounts
+    const accountsToTrace = selectedLiquidityAccounts.length > 0 
       ? accounts.filter(a => selectedLiquidityAccounts.includes(a.id))
-      : accounts.filter(a => a.number.startsWith('1') || a.number.startsWith('2'));
+      : allLiquidityAccounts;
     
-    const liquidityAccountIds = new Set(liquidityAccounts.map(a => a.id));
+    const accountsToTraceIds = new Set(accountsToTrace.map(a => a.id));
 
     transactions.forEach(txn => {
-      if (!liquidityAccountIds.has(txn.accountId)) return;
+      if (!accountsToTraceIds.has(txn.accountId)) return;
       const date = new Date(parseISO(txn.date));
       const periodLabel = getPeriodLabel(date, selectedPeriodComparison);
       periodsSet.add(periodLabel);
@@ -555,7 +559,7 @@ export default function Dashboard() {
       let credits = 0;
 
       transactions.forEach(txn => {
-        if (!liquidityAccountIds.has(txn.accountId)) return;
+        if (!accountsToTraceIds.has(txn.accountId)) return;
         const date = new Date(parseISO(txn.date));
         const p = getPeriodLabel(date, selectedPeriodComparison);
         if (p === period) {
@@ -571,8 +575,8 @@ export default function Dashboard() {
       };
     });
 
-    return { chartData, periods, liquidityAccounts };
-  }, [transactions, accounts, selectedLiquidityAccounts, selectedPeriodComparison]);
+    return { chartData, periods };
+  }, [transactions, accounts, selectedLiquidityAccounts, selectedPeriodComparison, allLiquidityAccounts]);
 
   // Pie Chart Data by Categories (Actifs, Passifs, Produits, Charges)
   const pieChartCategories = useMemo(() => {
@@ -1187,10 +1191,10 @@ export default function Dashboard() {
                   <CardContent className="space-y-3">
                     <p className="text-xs text-muted-foreground">Sélectionnez les comptes à suivre:</p>
                     <div className="max-h-[400px] overflow-y-auto space-y-2">
-                      {liquidityTrackingData.liquidityAccounts.map((acc) => (
+                      {allLiquidityAccounts.map((acc) => (
                         <div key={acc.id} className="flex items-center gap-2 p-2 rounded-md border border-border hover:bg-muted/50">
                           <Checkbox
-                            checked={selectedLiquidityAccounts.includes(acc.id)}
+                            checked={selectedLiquidityAccounts.length === 0 || selectedLiquidityAccounts.includes(acc.id)}
                             onCheckedChange={(checked) => {
                               if (checked) {
                                 setSelectedLiquidityAccounts([...selectedLiquidityAccounts, acc.id]);
